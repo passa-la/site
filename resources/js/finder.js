@@ -29,6 +29,7 @@ export const finder = (today) => ({
     mode: 'place',
     places: [],
     found: [],
+    similar: false,
     hits: [],
     wide: false,
     place: null,
@@ -75,12 +76,49 @@ export const finder = (today) => ({
 
     swap(mode) {
         this.mode = mode
+        this.q = ''
         this.places = []
         this.found = []
+        this.similar = false
         this.menu = false
         this.aim = false
-        this.type()
+
+        if (mode === 'line' && this.place) {
+            this.place = null
+            this.hits = []
+            this.paint(true)
+            this.save()
+        }
+
+        if (mode === 'line' && this.detail) {
+            this.like(this.detail.line)
+        }
+
         this.$nextTick(() => this.$refs.q.focus())
+    },
+
+    home() {
+        return !this.place && !this.detail && !(this.mode === 'line' && this.q.trim())
+    },
+
+    heading() {
+        if (this.similar) {
+            return `Parecidas com a ${this.detail?.line.code ?? ''}`
+        }
+
+        const n = this.found.length
+        return n === 1 ? '1 linha encontrada' : `${n} linhas encontradas`
+    },
+
+    async like(l) {
+        const term = l.name.split(/[\/(]/)[0].trim() || l.code
+
+        try {
+            this.found = await api.find(term)
+            this.similar = true
+        } catch {
+            this.found = []
+        }
     },
 
     type() {
@@ -91,6 +129,11 @@ export const finder = (today) => ({
             this.places = []
             this.found = []
             this.menu = false
+
+            if (this.mode === 'line' && this.detail) {
+                this.like(this.detail.line)
+            }
+
             return
         }
 
@@ -106,8 +149,13 @@ export const finder = (today) => ({
             const all = mode === 'line' ? await api.find(q) : await api.places(q)
 
             if (q === this.q.trim() && mode === this.mode) {
-                mode === 'line' ? (this.found = all) : (this.places = all)
-                this.menu = true
+                if (mode === 'line') {
+                    this.found = all
+                    this.similar = false
+                } else {
+                    this.places = all
+                    this.menu = true
+                }
             }
         } catch {
             this.fail = 'Não deu pra buscar agora. Tenta de novo em instantes.'
@@ -125,8 +173,13 @@ export const finder = (today) => ({
     },
 
     line(l) {
+        if (this.mode !== 'line') {
+            this.mode = 'line'
+            this.q = ''
+            this.found = []
+        }
+
         this.menu = false
-        this.q = ''
         this.place = null
         this.hits = []
         this.open(l.id)
@@ -227,6 +280,11 @@ export const finder = (today) => ({
             }
 
             this.remember()
+
+            if (this.mode === 'line' && !this.place && !this.q.trim()) {
+                this.like(this.detail.line)
+            }
+
             await this.route(true)
         } catch {
             this.fail = 'Não deu pra abrir essa linha. Tenta de novo.'
@@ -394,13 +452,13 @@ export const finder = (today) => ({
     },
 
     async again(r) {
-        if (r.place) {
-            await this.pick(r.place)
-        } else {
-            this.place = null
-            this.q = ''
+        if (!r.place) {
+            this.line(r.line)
+            return
         }
 
+        this.mode = 'place'
+        await this.pick(r.place)
         await this.open(r.line.id)
     },
 
@@ -411,7 +469,12 @@ export const finder = (today) => ({
         this.focus = null
 
         if (!this.place) {
-            this.clear()
+            this.save()
+
+            if (this.mode !== 'line') {
+                this.clear()
+            }
+
             return
         }
 

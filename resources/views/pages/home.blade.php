@@ -28,19 +28,8 @@
                     </x-ui.button>
                 </div>
 
-                <ul x-show="menu" x-cloak x-on:click.outside="menu = false" class="absolute inset-x-0 top-full z-20 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-edge bg-card p-1 shadow-lg">
-                    <template x-for="l in mode === 'line' ? found : []" x-bind:key="'l' + l.id">
-                        <li>
-                            <x-ui.button variant="row" x-on:click="line(l)" class="gap-3">
-                                <x-ui.code x-text="l.code" />
-                                <span class="min-w-0">
-                                    <span class="block truncate font-medium" x-text="nick(l.id) ? `${nick(l.id)} · ${l.name}` : l.name"></span>
-                                    <span class="block truncate text-xs text-mute first-letter:uppercase" x-text="l.agency"></span>
-                                </span>
-                            </x-ui.button>
-                        </li>
-                    </template>
-                    <template x-for="p in mode === 'place' ? places : []" x-bind:key="p.lat + ',' + p.lon">
+                <ul x-show="menu && mode === 'place'" x-cloak x-on:click.outside="menu = false" class="absolute inset-x-0 top-full z-20 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-edge bg-card p-1 shadow-lg">
+                    <template x-for="p in places" x-bind:key="p.lat + ',' + p.lon">
                         <li>
                             <x-ui.button variant="row" x-on:click="pick(p)" class="gap-3">
                                 <x-icon name="pin" class="size-5 shrink-0 text-mute" />
@@ -55,7 +44,6 @@
                         Não achei esse lugar em Pernambuco. Tenta outro nome ou
                         <button type="button" x-on:click="target()" class="cursor-pointer font-medium text-fg underline">marca no mapa</button>.
                     </li>
-                    <li x-show="mode === 'line' && !found.length" class="px-3 py-3 text-sm text-mute">Nenhuma linha com esse número ou nome.</li>
                 </ul>
             </form>
 
@@ -76,46 +64,20 @@
                 </div>
             </div>
 
-            <div x-show="!place && !detail && favs.length" x-cloak class="mt-5">
+            <div x-show="home() && favs.length" x-cloak class="mt-5">
                 <p class="text-sm font-medium text-mute">Favoritas</p>
                 <ul class="mt-1 divide-y divide-edge">
                     <template x-for="f in favs" x-bind:key="'f' + f.id">
-                        <li class="flex items-center gap-1">
-                            <x-ui.button variant="row" x-on:click="line(f)" class="-ml-3 min-w-0 flex-1 gap-3">
-                                <x-ui.code x-text="f.code" />
-                                <span class="min-w-0 flex-1">
-                                    <span class="block truncate font-medium" x-text="f.nick || f.name"></span>
-                                    <span x-show="f.nick" class="block truncate text-xs text-mute" x-text="f.name"></span>
-                                </span>
-                            </x-ui.button>
-                            <x-ui.button variant="ghost" x-on:click="star(f)" aria-pressed="true" aria-label="Tirar das favoritas" class="-mr-2 shrink-0 px-2">
-                                <x-icon name="star" class="size-5 fill-current text-sun" />
-                            </x-ui.button>
-                        </li>
+                        <x-line line="f" note="''" x-on:click="line(f)" />
                     </template>
                 </ul>
             </div>
 
-            <div x-show="!place && !detail && recents.length" x-cloak class="mt-5">
+            <div x-show="home() && recents.length" x-cloak class="mt-5">
                 <p class="text-sm font-medium text-mute">Ônibus recentes</p>
                 <ul class="mt-1 divide-y divide-edge">
                     <template x-for="r in recents" x-bind:key="r.line.id + (r.place?.name ?? '')">
-                        <li class="flex items-center gap-1">
-                            <x-ui.button variant="row" x-on:click="again(r)" class="-ml-3 min-w-0 flex-1 gap-3">
-                                <x-ui.code x-text="r.line.code" />
-                                <span class="min-w-0 flex-1">
-                                    <span class="flex min-w-0 items-center gap-1.5">
-                                        <span x-show="nick(r.line.id)" class="shrink-0 rounded-md bg-sun/20 px-1.5 text-xs font-semibold" x-text="nick(r.line.id)"></span>
-                                        <span class="truncate font-medium" x-text="r.line.name"></span>
-                                    </span>
-                                    <span class="block truncate text-xs text-mute" x-text="r.place ? 'perto de ' + r.place.name : 'busca por linha'"></span>
-                                </span>
-                            </x-ui.button>
-                            <x-ui.button variant="ghost" x-on:click="star(r.line)" x-bind:aria-pressed="!!fav(r.line.id)"
-                                x-bind:aria-label="fav(r.line.id) ? 'Tirar das favoritas' : 'Favoritar'" class="-mr-2 shrink-0 px-2">
-                                <x-icon name="star" class="size-5" x-bind:class="fav(r.line.id) && 'fill-current text-sun'" />
-                            </x-ui.button>
-                        </li>
+                        <x-line line="r.line" note="r.place ? 'perto de ' + r.place.name : 'busca por linha'" x-on:click="again(r)" />
                     </template>
                 </ul>
             </div>
@@ -225,6 +187,21 @@
         </aside>
 
         <section class="flex flex-1 flex-col px-4 lg:col-start-1 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:px-6">
+            <template x-if="mode === 'line' && !place">
+                <div class="pt-2 pb-6">
+                    <p x-show="busy === 'search'" class="text-sm text-mute">Procurando linhas…</p>
+                    <p x-show="busy !== 'search' && found.length" class="mb-2 text-sm text-mute" x-text="heading()"></p>
+                    <p x-show="busy !== 'search' && q.trim() && !found.length" class="rounded-2xl border border-dashed border-edge p-5 text-center text-sm text-mute">
+                        Nenhuma linha com esse número ou nome.
+                    </p>
+                    <ul class="divide-y divide-edge">
+                        <template x-for="l in found" x-bind:key="'l' + l.id">
+                            <x-line line="l" x-on:click="line(l)" />
+                        </template>
+                    </ul>
+                </div>
+            </template>
+
             <template x-if="place">
                 <div class="pb-6">
                     <div role="group" aria-label="Distância" class="flex items-center gap-2 pt-2">
@@ -259,27 +236,12 @@
 
                     <ul class="divide-y divide-edge">
                         <template x-for="h in ranked()" x-bind:key="h.line.id">
-                            <li class="flex items-center gap-1">
-                                <x-ui.button variant="row" x-on:click="open(h.line.id)" x-bind:disabled="busy === 'line'" x-bind:aria-current="detail?.line.id === h.line.id"
-                                    x-bind:class="detail?.line.id === h.line.id && 'bg-edge/70 ring-1 ring-fg/20'" class="-ml-3 min-w-0 flex-1 gap-3">
-                                    <x-ui.code x-text="h.line.code" />
-                                    <span class="min-w-0 flex-1">
-                                        <span class="flex min-w-0 items-center gap-1.5">
-                                            <span x-show="nick(h.line.id)" class="shrink-0 rounded-md bg-sun/20 px-1.5 text-xs font-semibold" x-text="nick(h.line.id)"></span>
-                                            <span class="truncate font-medium" x-text="h.line.name"></span>
-                                        </span>
-                                        <span class="block truncate text-xs text-mute first-letter:uppercase" x-text="h.line.agency"></span>
-                                    </span>
-                                    <span class="shrink-0 text-right">
-                                        <span class="block text-sm font-semibold tabular-nums" x-text="meters(h.meters)"></span>
-                                        <span class="block text-xs text-mute" x-text="walking(h.meters)"></span>
-                                    </span>
-                                </x-ui.button>
-                                <x-ui.button variant="ghost" x-on:click="star(h.line)" x-bind:aria-pressed="!!fav(h.line.id)"
-                                    x-bind:aria-label="fav(h.line.id) ? 'Tirar das favoritas' : 'Favoritar'" class="-mr-2 shrink-0 px-2">
-                                    <x-icon name="star" class="size-5" x-bind:class="fav(h.line.id) && 'fill-current text-sun'" />
-                                </x-ui.button>
-                            </li>
+                            <x-line line="h.line" x-on:click="open(h.line.id)" x-bind:disabled="busy === 'line'">
+                                <span class="shrink-0 text-right">
+                                    <span class="block text-sm font-semibold tabular-nums" x-text="meters(h.meters)"></span>
+                                    <span class="block text-xs text-mute" x-text="walking(h.meters)"></span>
+                                </span>
+                            </x-line>
                         </template>
                     </ul>
                 </div>
