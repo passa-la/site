@@ -35,16 +35,21 @@ final class Reader
             $routes = $this->routes($csv);
             $best = $this->best($csv, $routes, $live);
             $reps = $this->reps($csv, $routes, $live, $best);
-            $links = $this->links($this->seqs($csv, $reps), $reps);
+            [$seqs, $book] = $this->scan($csv, $reps, $this->owners($csv, $routes, $live));
+            $links = $this->links($seqs, $reps);
+            $lines = $this->lines($routes, $links);
+            $kept = array_fill_keys(array_map(fn (Line $l) => $l->id, $lines), true);
 
             return new Feed(
                 $this->version($csv),
                 $tag,
                 new Network(
-                    $this->lines($routes, $links),
+                    $lines,
                     $this->stops($csv, $links),
                     $links,
                     $this->paths($csv, $best),
+                    $book->patterns($kept),
+                    $book->runs($kept),
                 ),
             );
         } finally {
@@ -159,23 +164,89 @@ final class Reader
         }
     }
 
-    private function seqs(Csv $csv, array $reps): array
+    private function owners(Csv $csv, array $routes, array $live): array
     {
-        $want = array_fill_keys(array_map('strval', $reps), true);
-        $seqs = [];
+        $owners = [];
 
-        foreach ($csv->rows('stop_times.txt', ['trip_id', 'stop_id', 'stop_sequence']) as $r) {
-            if (isset($want[$r['trip_id']])) {
-                $seqs[$r['trip_id']][(int) $r['stop_sequence']] = $r['stop_id'];
+        foreach ($csv->rows('trips.txt', ['route_id', 'service_id', 'trip_id', 'direction_id']) as $r) {
+            if (isset($routes[$r['route_id']], $live[$r['service_id']])) {
+                $owners[$r['trip_id']] = [$r['route_id'], (int) $r['direction_id'], $live[$r['service_id']]];
             }
         }
 
-        foreach ($seqs as &$s) {
-            ksort($s);
-            $s = array_values($s);
+        return $owners;
+    }
+
+    private function scan(Csv $csv, array $reps, array $owners): array
+    {
+        $want = array_fill_keys(array_map('strval', $reps), true);
+        $seqs = [];
+        $book = new Book;
+
+        foreach ($this->groups($csv) as $trip => $rows) {
+            $stops = array_column($rows, 0);
+
+            if (isset($want[$trip])) {
+                $seqs[$trip] = $stops;
+            }
+
+            $times = isset($owners[$trip]) ? $this->times(array_column($rows, 1)) : null;
+
+            if ($times) {
+                [$line, $dir, $mask] = $owners[$trip];
+                $book->add((string) $line, $dir, $mask, $stops, $times);
+            }
         }
 
-        return $seqs;
+        return [$seqs, $book];
+    }
+
+    private function groups(Csv $csv): Generator
+    {
+        $trip = null;
+        $rows = [];
+        $done = [];
+
+        foreach ($csv->rows('stop_times.txt', ['trip_id', 'stop_id', 'stop_sequence', 'departure_time']) as $r) {
+            if ($r['trip_id'] !== $trip) {
+                if ($trip !== null) {
+                    ksort($rows);
+                    yield $trip => $rows;
+                    $done[$trip] = true;
+                }
+
+                if (isset($done[$r['trip_id']])) {
+                    throw new RuntimeException("stop_times.txt splits trip {$r['trip_id']}");
+                }
+
+                $trip = $r['trip_id'];
+                $rows = [];
+            }
+
+            $rows[(int) $r['stop_sequence']] = [$r['stop_id'], $r['departure_time']];
+        }
+
+        if ($trip !== null) {
+            ksort($rows);
+            yield $trip => $rows;
+        }
+    }
+
+    private function times(array $raw): ?array
+    {
+        $out = [];
+
+        foreach ($raw as $t) {
+            $p = explode(':', $t);
+
+            if (count($p) !== 3) {
+                return null;
+            }
+
+            $out[] = (int) $p[0] * 3600 + (int) $p[1] * 60 + (int) $p[2];
+        }
+
+        return $out;
     }
 
     private function links(array $seqs, array $reps): array

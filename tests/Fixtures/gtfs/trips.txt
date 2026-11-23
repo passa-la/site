@@ -8,3 +8,4 @@ route_id,service_id,trip_id,trip_headsign,direction_id,shape_id
 200,WK,T3,Shopping,0,SH3
 300,OLD,T4,Extinta,0,SH4
 M1,WK,T5,Metrô,0,SH5
+100,WK,T10,Centro,1,SH2

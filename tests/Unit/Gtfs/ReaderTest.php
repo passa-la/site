@@ -4,6 +4,7 @@ use App\Domain\Transit\Day;
 use App\Domain\Transit\Line;
 use App\Domain\Transit\Link;
 use App\Domain\Transit\Path;
+use App\Domain\Transit\Run;
 use App\Infra\Gtfs\Reader;
 
 beforeEach(function () {
@@ -69,4 +70,45 @@ it('keeps the most used shape of each direction per day', function () {
     $week = array_values(array_filter($this->feed->net->paths, fn (Path $p) => $p->line === '100' && $p->dir === 0 && $p->days === [Day::Weekday]))[0];
 
     expect(array_map(fn ($pt) => $pt->lat, $week->points))->toBe([-8.0001, -8.01, -8.02]);
+});
+
+it('keeps every trip with its times, grouped by stop pattern', function () {
+    $stops = [];
+
+    foreach ($this->feed->net->patterns as $p) {
+        $stops[$p->id] = $p->line.':'.$p->dir.':'.implode('>', $p->stops);
+    }
+
+    $runs = array_map(
+        fn (Run $r) => $stops[$r->pattern].'@'.implode(',', $r->times).':'.implode('+', array_map(fn (Day $d) => $d->value, $r->days)),
+        $this->feed->net->runs,
+    );
+    sort($runs);
+
+    expect(count($stops))->toBe(5)
+        ->and($runs)->toBe([
+            '100:0:S1>S2>S3@32400,33000,33600:sunday',
+            '100:0:S1>S3@18000,18600:weekday',
+            '100:0:S1>S3@21600,22200:weekday',
+            '100:0:S1>S4@25200,25800:weekday',
+            '100:1:S3>S1@21600,22200:weekday',
+            '100:1:S3>S1@36000,36600:sunday',
+            '100:1:S3>S1@88200,88800:weekday',
+            '200:0:S2@25200:weekday',
+        ]);
+});
+
+it('refuses stop times that split a trip', function () {
+    $file = sys_get_temp_dir().'/passa-split-'.getmypid().'.zip';
+    $zip = new ZipArchive;
+    $zip->open($file, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+    foreach (glob(__DIR__.'/../../Fixtures/gtfs/*.txt') as $f) {
+        $zip->addFile($f, basename($f));
+    }
+
+    $zip->addFromString('stop_times.txt', "trip_id,arrival_time,departure_time,stop_id,stop_sequence\nT1,05:00:00,05:00:00,S1,1\nT7,06:00:00,06:00:00,S1,1\nT1,05:10:00,05:10:00,S3,2\n");
+    $zip->close();
+
+    expect(fn () => (new Reader)->read($file, null, '20261123'))->toThrow(RuntimeException::class);
 });

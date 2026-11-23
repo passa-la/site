@@ -9,6 +9,8 @@ final readonly class Network
         public array $stops,
         public array $links,
         public array $paths,
+        public array $patterns = [],
+        public array $runs = [],
     ) {}
 
     public function codes(): array

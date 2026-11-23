@@ -8,6 +8,8 @@ use App\Domain\Transit\Feed;
 use App\Domain\Transit\Line;
 use App\Domain\Transit\Link;
 use App\Domain\Transit\Path;
+use App\Domain\Transit\Pattern;
+use App\Domain\Transit\Run;
 use App\Domain\Transit\Stop;
 use App\Domain\Transit\Store as Port;
 use App\Infra\Mask;
@@ -45,7 +47,7 @@ final readonly class Store implements Port
     public function save(Feed $feed, Change $change): void
     {
         $this->db->transaction(function () use ($feed, $change) {
-            foreach (['paths', 'line_stop', 'stops', 'lines'] as $t) {
+            foreach (['runs', 'pattern_stop', 'patterns', 'paths', 'line_stop', 'stops', 'lines'] as $t) {
                 $this->db->table($t)->delete();
             }
 
@@ -53,6 +55,8 @@ final readonly class Store implements Port
             $this->stops($feed->net->stops);
             $this->links($feed->net->links);
             $this->paths($feed->net->paths);
+            $this->patterns($feed->net->patterns);
+            $this->runs($feed->net->runs);
 
             $this->db->table('syncs')->insert([
                 'version' => $feed->version,
@@ -113,6 +117,38 @@ final readonly class Store implements Port
                 fn (Path $p) => [$p->line, $p->dir, Mask::of($p->days), $this->wkt($p->points)],
                 $c,
             ));
+        }
+    }
+
+    private function patterns(array $patterns): void
+    {
+        $heads = array_map(fn (Pattern $p) => ['id' => $p->id, 'line_id' => $p->line, 'dir' => $p->dir], $patterns);
+
+        foreach (array_chunk($heads, self::CHUNK) as $c) {
+            $this->db->table('patterns')->insert($c);
+        }
+
+        $stops = [];
+
+        foreach ($patterns as $p) {
+            foreach ($p->stops as $i => $s) {
+                $stops[] = ['pattern_id' => $p->id, 'pos' => $i + 1, 'stop_id' => $s];
+            }
+        }
+
+        foreach (array_chunk($stops, self::CHUNK) as $c) {
+            $this->db->table('pattern_stop')->insert($c);
+        }
+    }
+
+    private function runs(array $runs): void
+    {
+        foreach (array_chunk($runs, self::CHUNK) as $c) {
+            $this->db->table('runs')->insert(array_map(fn (Run $r) => [
+                'pattern_id' => $r->pattern,
+                'days' => Mask::of($r->days),
+                'times' => '{'.implode(',', $r->times).'}',
+            ], $c));
         }
     }
 
