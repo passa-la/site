@@ -23,7 +23,17 @@ Por enquanto cobre a Região Metropolitana do Recife (Pernambuco).
 As linhas vêm do [GTFS do Grande Recife](https://www.granderecife.pe.gov.br/gtfs/gtfs.zip).
 O comando `gtfs:sync` baixa o feed (só quando o ETag muda), importa só as linhas de ônibus com
 serviço ativo e, pra cada sentido e tipo de dia, o trajeto mais usado e a ordem das paradas da viagem
-principal. Registra em `syncs` quais linhas entraram e saíram. Ele roda toda segunda às 04:00.
+principal. Registra em `syncs` quais linhas entraram e saíram.
+
+### Atualização semanal
+
+Em produção quem roda o `gtfs:sync` é o GitHub Actions (`.github/workflows/gtfs.yml`), toda segunda às
+04:00 do Recife, então o servidor não precisa de agendador. Pra ativar, cadastre o secret `DB_URL`
+(`postgresql://usuario:senha@host:porta/banco?sslmode=require`) em Settings → Secrets and variables →
+Actions. Cada execução deixa no resumo as linhas que entraram e saíram, abre uma issue quando alguma
+linha muda e pode ser disparada na mão em Actions → Linhas do Grande Recife → Run workflow.
+
+Rodando tudo na própria máquina, o container `scheduler` faz o mesmo papel.
 
 ## Rodando
 

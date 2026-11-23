@@ -3,12 +3,13 @@
 namespace App\Console\Commands;
 
 use App\Cases\Sync as Run;
+use App\Console\Report;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
-#[Signature('gtfs:sync {--force : Import even if the feed did not change}')]
+#[Signature('gtfs:sync {--force : Import even if the feed did not change} {--report= : Write a markdown report to this file}')]
 #[Description('Download the GTFS feed and rebuild the transit network')]
 class Sync extends Command
 {
@@ -17,6 +18,11 @@ class Sync extends Command
         ini_set('memory_limit', '1G');
 
         $change = $run((bool) $this->option('force'));
+        $report = $this->option('report');
+
+        if (is_string($report) && $report !== '') {
+            file_put_contents($report, Report::of($change));
+        }
 
         if (! $change) {
             $this->info('Feed unchanged.');
