@@ -11,10 +11,13 @@ use App\Domain\Transit\Stop;
 use App\Domain\Transit\Way;
 use App\Infra\Mask;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Support\Str;
 
 final readonly class Lines implements Port
 {
     private const int SLACK = 10;
+
+    private const int LIMIT = 20;
 
     private const string STOP = 'select s.id, s.name, st_y(s.geom::geometry) as lat, st_x(s.geom::geometry) as lon';
 
@@ -55,6 +58,29 @@ final readonly class Lines implements Port
         $r = $this->db->table('lines')->where('id', $id)->first();
 
         return $r ? $this->line($r) : null;
+    }
+
+    public function match(string $q): array
+    {
+        $t = self::term($q);
+
+        if ($t === '') {
+            return [];
+        }
+
+        return $this->db->table('lines')
+            ->where('term', 'like', '%'.addcslashes($t, '%_\\').'%')
+            ->orderByRaw("case when ltrim(code, '0') = ltrim(?, '0') then 0 when code like ? then 1 else 2 end", [$t, addcslashes($t, '%_\\').'%'])
+            ->orderBy('code')
+            ->limit(self::LIMIT)
+            ->get()
+            ->map(fn (object $r) => $this->line($r))
+            ->all();
+    }
+
+    public static function term(string $s): string
+    {
+        return Str::of($s)->ascii()->lower()->squish()->toString();
     }
 
     public function ways(string $id, Day $d): array

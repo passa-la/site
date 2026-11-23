@@ -65,6 +65,7 @@ final readonly class Store implements Port
             'name' => $l->name,
             'agency' => $l->agency,
             'days' => Mask::of($l->days),
+            'term' => Lines::term($l->code.' '.$l->name),
         ], $lines);
 
         foreach (array_chunk($rows, self::CHUNK) as $c) {

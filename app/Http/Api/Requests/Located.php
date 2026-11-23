@@ -2,6 +2,7 @@
 
 namespace App\Http\Api\Requests;
 
+use App\Domain\Geo\Circle;
 use App\Domain\Geo\Point;
 use App\Domain\Transit\Day;
 use Illuminate\Foundation\Http\FormRequest;
@@ -25,6 +26,7 @@ abstract class Located extends FormRequest
             'from_lon' => [$from, 'required_with:from_lat', 'numeric', 'between:-180,180'],
             'day' => ['nullable', Rule::enum(Day::class)],
             'stop' => ['nullable', 'string', 'max:40'],
+            'radius' => ['nullable', 'integer', 'between:'.Circle::MIN.','.Circle::WALK],
         ];
     }
 
@@ -41,6 +43,11 @@ abstract class Located extends FormRequest
     public function day(): Day
     {
         return $this->enum('day', Day::class) ?? Day::of(now());
+    }
+
+    public function radius(): int
+    {
+        return $this->integer('radius', Circle::WALK);
     }
 
     private function pair(string $lat, string $lon): ?Point

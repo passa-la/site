@@ -12,5 +12,7 @@ interface Lines
 
     public function find(string $id): ?Line;
 
+    public function match(string $q): array;
+
     public function ways(string $id, Day $d): array;
 }
