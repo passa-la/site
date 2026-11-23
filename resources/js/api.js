@@ -18,8 +18,8 @@ export const api = {
     reverse: async (p) => (await get('places/reverse', at(p))).data,
     find: async (q) => (await get('lines/search', { q })).data,
     lines: (p, day, radius) => get('lines', { ...at(p), day, radius }),
-    line: async (id, { day, to, from, stop }) =>
-        (await get(`lines/${encodeURIComponent(id)}`, { ...at(to), ...at(from, 'from_'), day, stop })).data,
+    line: async (id, { day, to, from, stop, end }) =>
+        (await get(`lines/${encodeURIComponent(id)}`, { ...at(to), ...at(from, 'from_'), day, stop, end })).data,
     rides: (from, to, day, radius) => get('rides', { ...at(to), ...at(from, 'from_'), day, radius }),
     walk: async (from, to) => (await get('walk', { ...at(to), ...at(from, 'from_') })).data,
 }

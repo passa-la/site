@@ -140,6 +140,7 @@ export const ride = () => ({
         this.rides = []
         this.detail = null
         this.chosen = null
+        this.end = null
         this.walk = null
 
         if (push) {
@@ -171,6 +172,7 @@ export const ride = () => ({
     async ride(r) {
         this.aiming = null
         this.chosen = r.board.stop.id
+        this.end = r.drop.stop.id
         await this.open(r.line.id)
     },
 

@@ -239,15 +239,54 @@
                                     <x-ui.button x-show="geo !== 'denied'" x-on:click="locate()" class="shrink-0 text-sm">Usar</x-ui.button>
                                 </div>
 
+                                <p x-show="detail.runs && !way()?.board" class="rounded-2xl border border-dashed border-edge p-4 text-sm text-mute">
+                                    Toca numa parada no mapa pra ver a que horas o ônibus passa nela.
+                                </p>
+
                                 <template x-if="way()?.board">
                                     <div class="rounded-2xl border border-edge bg-card p-4">
                                         <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde pegar · <span x-text="label(way().dir)"></span></p>
                                         <p class="mt-1 font-semibold" x-text="stop(way().board.stop)"></p>
                                         <p class="text-sm text-mute" x-text="trip()"></p>
                                         <p x-show="detail.ways.length > 1 && way().drop && !way().fits" class="mt-2 rounded-xl bg-alert/10 px-3 py-2 text-sm text-alert">
-                                            Nesse sentido o ônibus passa pelo destino antes da sua parada. Dá uma olhada no outro sentido.
+                                            Nesse sentido o ônibus passa por onde você desce antes de onde você pega. Dá uma olhada no outro sentido.
                                         </p>
-                                        <p class="mt-2 text-xs text-mute">Toca em outra parada no mapa pra trocar.</p>
+                                        <template x-if="way().times">
+                                            <div class="mt-3 border-t border-edge pt-3">
+                                                <template x-if="way().times.next">
+                                                    <div>
+                                                        <p class="text-xs font-medium tracking-wide text-mute uppercase">Próximos ônibus · previsto</p>
+                                                        <p x-show="!soon(way()).length && way().times.all.length" class="mt-1 text-sm text-mute">Nenhum ônibus passa mais hoje nessa parada.</p>
+                                                        <ul class="mt-1 space-y-1">
+                                                            <template x-for="(b, i) in soon(way())" x-bind:key="i">
+                                                                <li class="flex items-baseline justify-between gap-3 tabular-nums">
+                                                                    <span>
+                                                                        <strong class="text-lg" x-text="b.at"></strong>
+                                                                        <span x-show="b.end" class="text-sm text-mute" x-text="`→ chega ${b.end}`"></span>
+                                                                    </span>
+                                                                    <span class="shrink-0 text-sm text-mute" x-text="wait(b.in)"></span>
+                                                                </li>
+                                                            </template>
+                                                        </ul>
+                                                    </div>
+                                                </template>
+                                                <p x-show="!way().times.all.length" class="text-sm text-mute">Nenhum ônibus sai dessa parada <span x-text="days[day].when"></span>.</p>
+                                                <x-ui.button variant="ghost" x-show="way().times.all.length" x-on:click="table = !table" x-bind:aria-expanded="table" class="mt-1 -ml-3 text-sm">
+                                                    <span x-text="table ? 'Esconder os horários' : `Todos os horários ${days[day].when}`"></span>
+                                                </x-ui.button>
+                                                <dl x-show="table" class="mt-1 space-y-1 text-sm tabular-nums">
+                                                    <template x-for="(g, i) in hours(way())" x-bind:key="i">
+                                                        <div class="flex gap-3">
+                                                            <dt class="w-6 shrink-0 font-semibold" x-text="g.h"></dt>
+                                                            <dd class="flex flex-wrap gap-x-2.5 text-mute">
+                                                                <template x-for="(m, j) in g.m" x-bind:key="j"><span x-text="m"></span></template>
+                                                            </dd>
+                                                        </div>
+                                                    </template>
+                                                </dl>
+                                            </div>
+                                        </template>
+                                        <p class="mt-2 text-xs text-mute" x-text="nudge()"></p>
                                     </div>
                                 </template>
 
@@ -255,7 +294,9 @@
                                     <div class="rounded-2xl border border-edge bg-card p-4">
                                         <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde descer · <span x-text="label(w.dir)"></span></p>
                                         <p class="mt-1 font-semibold" x-text="stop(w.drop.stop)"></p>
-                                        <p class="text-sm text-mute" x-text="`${meters(w.drop.meters)} de ${spotName(dest())} · ${walking(w.drop.meters)}`"></p>
+                                        <p x-show="dest()" class="text-sm text-mute" x-text="`${meters(w.drop.meters)} de ${spotName(dest())} · ${walking(w.drop.meters)}`"></p>
+                                        <p x-show="arrive(w)" class="text-sm text-mute" x-text="arrive(w)"></p>
+                                        <x-ui.button variant="ghost" x-show="end && w.drop.stop.id === end" x-on:click="unend()" class="mt-1 -ml-3 text-sm">Tirar essa parada</x-ui.button>
                                     </div>
                                 </template>
 

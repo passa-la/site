@@ -13,6 +13,7 @@ const WALK = 1000
 const RADII = [300, 500, 1000]
 const MIN = { place: 3, line: 1 }
 const SIDE = 390
+const TICK = 30000
 
 
 const DAYS = {
@@ -58,6 +59,10 @@ export const finder = (today) => ({
     geo: 'ask',
     focus: null,
     chosen: null,
+    end: null,
+    table: false,
+    tick: Date.now(),
+    got: 0,
     walk: null,
     recents: [],
 
@@ -77,7 +82,17 @@ export const finder = (today) => ({
         }
 
         window.addEventListener('popstate', () => this.restore())
+        setInterval(() => this.beat(), TICK)
         this.restore()
+    },
+
+    beat() {
+        this.tick = Date.now()
+        const w = this.way()
+
+        if (!this.busy && w?.times?.next && this.soon(w).length < w.times.next.length) {
+            this.refresh()
+        }
     },
 
     hint() {
@@ -316,6 +331,7 @@ export const finder = (today) => ({
 
         try {
             const me = this.origin()
+            this.table = false
             this.detail = await this.fetch(id)
 
             if (this.origin() !== me) {
@@ -345,8 +361,12 @@ export const finder = (today) => ({
         }
     },
 
-    fetch(id) {
-        return api.line(id, { day: this.day, to: this.dest(), from: this.origin(), stop: this.chosen })
+    async fetch(id) {
+        const d = await api.line(id, { day: this.day, to: this.dest(), from: this.origin(), stop: this.chosen, end: this.end })
+        this.got = Date.now()
+        this.tick = this.got
+
+        return d
     },
 
     async refresh() {
@@ -364,8 +384,19 @@ export const finder = (today) => ({
             return
         }
 
-        this.chosen = id
+        if (this.chosen && !this.end && id !== this.chosen) {
+            this.end = id
+        } else {
+            this.chosen = id
+            this.end = null
+        }
+
         await this.refresh()
+    },
+
+    unend() {
+        this.end = null
+        this.refresh()
     },
 
     show(dir) {
@@ -421,6 +452,7 @@ export const finder = (today) => ({
 
         this.day = d
         this.chosen = null
+        this.end = null
         this.save()
 
         if (this.mode === 'ride') {
@@ -501,6 +533,7 @@ export const finder = (today) => ({
     close() {
         this.detail = null
         this.chosen = null
+        this.end = null
         this.walk = null
         this.focus = null
 
@@ -529,6 +562,7 @@ export const finder = (today) => ({
         this.hits = []
         this.wide = false
         this.chosen = null
+        this.end = null
         this.walk = null
         this.focus = null
         this.fail = ''
@@ -692,7 +726,7 @@ export const finder = (today) => ({
     trip() {
         const w = this.way()
 
-        if (!w?.board) {
+        if (!w?.board || !this.origin()) {
             return ''
         }
 
@@ -701,5 +735,60 @@ export const finder = (today) => ({
         return this.walk
             ? `${this.meters(this.walk.meters)} de ${who} · ${this.walk.minutes} min a pé`
             : `${this.meters(w.board.meters)} de ${who}`
+    },
+
+    soon(w) {
+        const gone = Math.floor((this.tick - this.got) / 60000)
+
+        return (w?.times?.next ?? []).map((b) => ({ ...b, in: b.in - gone })).filter((b) => b.in >= 0)
+    },
+
+    wait(m) {
+        if (m < 1) {
+            return 'agora'
+        }
+
+        if (m < 60) {
+            return `em ${m} min`
+        }
+
+        return `em ${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`
+    },
+
+    hours(w) {
+        const out = []
+
+        for (const t of w?.times?.all ?? []) {
+            const [h, m] = t.split(':')
+            const last = out.at(-1)
+
+            if (last?.h === h) {
+                last.m.push(m)
+            } else {
+                out.push({ h, m: [m] })
+            }
+        }
+
+        return out
+    },
+
+    arrive(w) {
+        const t = w?.times
+
+        if (!t?.ride || t.end !== w.drop?.stop.id) {
+            return ''
+        }
+
+        const b = this.soon(w)[0]
+
+        return b?.end ? `Próximo chega ~${b.end} · ${t.ride} min de ônibus` : `~${t.ride} min de ônibus`
+    },
+
+    nudge() {
+        if (!this.chosen) {
+            return 'Toca em outra parada no mapa pra trocar.'
+        }
+
+        return this.end ? 'Toca em outra parada pra escolher outro embarque.' : 'Toca na parada onde vai descer pra ver a que horas chega.'
     },
 })
