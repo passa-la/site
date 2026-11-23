@@ -1,0 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE DATABASE passa_test;
+\c passa_test
+CREATE EXTENSION IF NOT EXISTS postgis;
