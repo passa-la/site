@@ -1,8 +1,8 @@
 @extends('layouts.site')
 
 @section('main')
-    <main x-data="finder({{ Js::from($today) }})" class="mx-auto flex min-h-dvh max-w-7xl flex-col lg:grid lg:h-dvh lg:grid-cols-[minmax(360px,440px)_1fr] lg:grid-rows-[auto_1fr] lg:gap-x-6 lg:p-6">
-        <header class="px-4 pt-6 pb-4 lg:col-start-1 lg:row-start-1 lg:px-0 lg:pt-2">
+    <main x-data="finder({{ Js::from($today) }})" class="mx-auto flex min-h-dvh max-w-7xl flex-col lg:mx-0 lg:grid lg:h-dvh lg:max-w-none lg:grid-cols-[420px_1fr] lg:grid-rows-[auto_1fr]">
+        <header class="px-4 pt-6 pb-4 lg:col-start-1 lg:row-start-1 lg:px-6">
             <a href="/" x-on:click.prevent="clear()" class="inline-block text-3xl font-bold tracking-tight">passa lá<span class="text-sun">?</span></a>
             <p x-show="!place && !detail" class="mt-1 text-mute">Digita pra onde você vai e a gente mostra os ônibus que passam a até 1 km de lá.</p>
 
@@ -107,7 +107,7 @@
             <p x-show="fail" x-text="fail" x-cloak class="mt-3 rounded-xl bg-alert/10 px-3 py-2 text-sm text-alert"></p>
         </header>
 
-        <section x-bind:class="detail ? 'h-[55dvh]' : aim ? 'h-[60dvh]' : place ? 'h-56' : 'hidden'" class="relative lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:h-auto">
+        <section x-bind:class="detail ? 'h-[55dvh]' : aim ? 'h-[60dvh]' : place ? 'h-56' : 'hidden'" class="relative lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:h-auto lg:py-3 lg:pr-3">
             <div x-ref="map" class="size-full overflow-hidden lg:rounded-3xl lg:border lg:border-edge"></div>
             <div x-show="aim" x-cloak class="pointer-events-none absolute inset-x-0 bottom-10 flex justify-center px-3">
                 <div class="pointer-events-auto flex items-center gap-2 rounded-full bg-ink py-1.5 pr-1.5 pl-4 text-sm text-white shadow-lg">
@@ -118,7 +118,7 @@
         </section>
 
         <aside x-show="detail" x-cloak aria-label="Linha selecionada"
-            class="px-4 lg:z-10 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:m-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[360px] lg:self-start lg:justify-self-end lg:overflow-y-auto lg:rounded-3xl lg:border lg:border-edge lg:bg-paper lg:px-5 lg:shadow-2xl">
+            class="px-4 lg:z-10 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:my-7 lg:mr-7 lg:max-h-[calc(100%-3.5rem)] lg:w-[360px] lg:self-start lg:justify-self-end lg:overflow-y-auto lg:rounded-3xl lg:border lg:border-edge lg:bg-paper lg:px-5 lg:shadow-2xl">
                 <template x-if="detail">
                     <div class="space-y-4 py-4 lg:py-5">
                         <div class="flex items-start gap-3">
@@ -185,7 +185,7 @@
                 </template>
         </aside>
 
-        <section class="flex flex-1 flex-col px-4 lg:col-start-1 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:px-0">
+        <section class="flex flex-1 flex-col px-4 lg:col-start-1 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:px-6">
             <template x-if="place">
                 <div class="pb-6">
                     <div role="group" aria-label="Distância" class="flex items-center gap-2 pt-2">
@@ -219,7 +219,7 @@
                         <template x-for="h in hits" x-bind:key="h.line.id">
                             <li>
                                 <x-ui.button variant="row" x-on:click="open(h.line.id)" x-bind:disabled="busy === 'line'" x-bind:aria-current="detail?.line.id === h.line.id"
-                                    x-bind:class="detail?.line.id === h.line.id && 'bg-edge/70 ring-1 ring-fg/20'" class="gap-3">
+                                    x-bind:class="detail?.line.id === h.line.id && 'bg-edge/70 ring-1 ring-fg/20'" class="-mx-3 w-[calc(100%+1.5rem)] gap-3">
                                     <x-ui.code x-text="h.line.code" />
                                     <span class="min-w-0 flex-1">
                                         <span class="block truncate font-medium" x-text="h.line.name"></span>
