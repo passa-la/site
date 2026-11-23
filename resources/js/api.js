@@ -15,7 +15,9 @@ const at = (p, prefix = '') => (p ? { [`${prefix}lat`]: p.lat, [`${prefix}lon`]:
 
 export const api = {
     places: async (q) => (await get('places', { q })).data,
-    lines: async (p, day) => (await get('lines', { ...at(p), day })).data,
+    reverse: async (p) => (await get('places/reverse', at(p))).data,
+    find: async (q) => (await get('lines/search', { q })).data,
+    lines: (p, day, radius) => get('lines', { ...at(p), day, radius }),
     line: async (id, { day, to, from, stop }) =>
         (await get(`lines/${encodeURIComponent(id)}`, { ...at(to), ...at(from, 'from_'), day, stop })).data,
     walk: async (from, to) => (await get('walk', { ...at(to), ...at(from, 'from_') })).data,

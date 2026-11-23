@@ -2,9 +2,11 @@ import { api } from './api'
 import { store } from './store'
 
 const WAIT = 300
-const MIN = 3
 const PACE = 75
 const KEEP = 6
+const WALK = 1000
+const RADII = [300, 500, 1000]
+const MIN = { place: 3, line: 1 }
 
 const DAYS = {
     weekday: { name: 'Dias úteis', when: 'em dias úteis' },
@@ -14,13 +16,22 @@ const DAYS = {
 
 const WAYS = ['Ida', 'Volta']
 
+const HINTS = {
+    place: 'Ex.: Shopping Patteo Olinda',
+    line: 'Ex.: 823 ou Jardim Brasil',
+}
+
 export const finder = (today) => ({
     q: '',
+    mode: 'place',
     places: [],
+    found: [],
     hits: [],
+    wide: false,
     place: null,
     detail: null,
     menu: false,
+    aim: false,
     busy: '',
     fail: '',
     timer: null,
@@ -28,6 +39,8 @@ export const finder = (today) => ({
     today,
     day: today,
     days: DAYS,
+    radii: RADII,
+    radius: WALK,
     me: null,
     geo: 'ask',
     focus: null,
@@ -36,9 +49,12 @@ export const finder = (today) => ({
     recents: [],
 
     init() {
-        this.map = import('./map/view').then(({ View }) => new View(this.$refs.map, { stop: (id) => this.board(id) }))
+        this.map = import('./map/view').then(
+            ({ View }) => new View(this.$refs.map, { stop: (id) => this.board(id), tap: (p) => this.tap(p) }),
+        )
         this.recents = store.get('recent', [])
         this.geo = store.get('geo', 'ask')
+        this.radius = RADII.includes(store.get('radius')) ? store.get('radius') : WALK
 
         if (this.geo === 'on') {
             this.locate()
@@ -48,12 +64,27 @@ export const finder = (today) => ({
         this.restore()
     },
 
+    hint() {
+        return HINTS[this.mode]
+    },
+
+    swap(mode) {
+        this.mode = mode
+        this.places = []
+        this.found = []
+        this.menu = false
+        this.aim = false
+        this.type()
+        this.$nextTick(() => this.$refs.q.focus())
+    },
+
     type() {
         clearTimeout(this.timer)
         this.fail = ''
 
-        if (this.q.trim().length < MIN) {
+        if (this.q.trim().length < MIN[this.mode]) {
             this.places = []
+            this.found = []
             this.menu = false
             return
         }
@@ -63,13 +94,14 @@ export const finder = (today) => ({
 
     async find() {
         const q = this.q.trim()
-        this.busy = 'places'
+        const mode = this.mode
+        this.busy = 'search'
 
         try {
-            const all = await api.places(q)
+            const all = mode === 'line' ? await api.find(q) : await api.places(q)
 
-            if (q === this.q.trim()) {
-                this.places = all
+            if (q === this.q.trim() && mode === this.mode) {
+                mode === 'line' ? (this.found = all) : (this.places = all)
                 this.menu = true
             }
         } catch {
@@ -80,15 +112,26 @@ export const finder = (today) => ({
     },
 
     first() {
-        if (this.places.length) {
+        if (this.mode === 'line' && this.found.length) {
+            this.line(this.found[0])
+        } else if (this.mode === 'place' && this.places.length) {
             this.pick(this.places[0])
         }
+    },
+
+    line(l) {
+        this.menu = false
+        this.q = ''
+        this.place = null
+        this.hits = []
+        this.open(l.id)
     },
 
     async pick(p, push = true) {
         this.place = p
         this.q = p.name
         this.menu = false
+        this.aim = false
         this.places = []
         this.reset()
 
@@ -96,7 +139,7 @@ export const finder = (today) => ({
             this.save()
         }
 
-        this.draw((v) => v.place(p, this.me))
+        this.draw((v) => v.place(p, this.me, this.radius))
         await this.load()
     },
 
@@ -105,11 +148,56 @@ export const finder = (today) => ({
         this.fail = ''
 
         try {
-            this.hits = await api.lines(this.place, this.day)
+            const r = await api.lines(this.place, this.day, this.radius)
+            this.hits = r.data
+            this.wide = r.meta.wide
         } catch {
             this.fail = 'Não deu pra carregar as linhas. Tenta de novo.'
         } finally {
             this.busy = ''
+        }
+    },
+
+    async tap(p) {
+        const desk = window.matchMedia('(min-width: 1024px)').matches
+
+        if (this.detail || (!this.aim && !this.place && !desk)) {
+            return
+        }
+
+        const at = { name: 'Ponto no mapa', label: '', lat: p.lat, lon: p.lon, pin: true }
+        this.mode = 'place'
+        await this.pick(at)
+
+        try {
+            const named = await api.reverse(at)
+
+            if (this.place === at || (this.place?.lat === at.lat && this.place?.lon === at.lon)) {
+                this.place = { ...named, lat: at.lat, lon: at.lon, pin: true }
+                this.q = this.place.name
+                history.replaceState(null, '', this.url())
+            }
+        } catch {}
+    },
+
+    target() {
+        this.aim = true
+        this.menu = false
+        this.draw(() => {})
+    },
+
+    async resize(r) {
+        if (r === this.radius) {
+            return
+        }
+
+        this.radius = r
+        store.set('radius', r)
+        this.save()
+
+        if (this.place) {
+            this.draw((v) => v.place(this.place, this.me, r))
+            await this.load()
         }
     },
 
@@ -198,7 +286,7 @@ export const finder = (today) => ({
             return
         }
 
-        const ctx = { place: this.place, me: this.me, way: this.way(), focus: this.focus, walk: this.walk }
+        const ctx = { place: this.place, me: this.me, way: this.way(), focus: this.focus, walk: this.walk, radius: this.radius }
         this.draw((v) => v.line(this.detail, ctx, fit))
     },
 
@@ -232,6 +320,7 @@ export const finder = (today) => ({
                 this.me = { lat: pos.coords.latitude, lon: pos.coords.longitude }
                 this.geo = 'on'
                 store.set('geo', 'on')
+
                 if (this.detail && this.busy !== 'line') {
                     this.refresh()
                 } else if (this.place) {
@@ -261,7 +350,13 @@ export const finder = (today) => ({
     },
 
     async again(r) {
-        await this.pick(r.place)
+        if (r.place) {
+            await this.pick(r.place)
+        } else {
+            this.place = null
+            this.q = ''
+        }
+
         await this.open(r.line.id)
     },
 
@@ -270,13 +365,20 @@ export const finder = (today) => ({
         this.chosen = null
         this.walk = null
         this.focus = null
+
+        if (!this.place) {
+            this.clear()
+            return
+        }
+
         this.save()
-        this.draw((v) => v.place(this.place, this.me))
+        this.draw((v) => v.place(this.place, this.me, this.radius))
     },
 
     reset() {
         this.detail = null
         this.hits = []
+        this.wide = false
         this.chosen = null
         this.walk = null
         this.focus = null
@@ -286,6 +388,7 @@ export const finder = (today) => ({
     clear() {
         this.place = null
         this.q = ''
+        this.aim = false
         this.reset()
         this.save()
         this.$nextTick(() => this.$refs.q.focus())
@@ -299,7 +402,7 @@ export const finder = (today) => ({
         })
     },
 
-    save() {
+    url() {
         const u = new URLSearchParams()
 
         if (this.place) {
@@ -320,7 +423,15 @@ export const finder = (today) => ({
             u.set('day', this.day)
         }
 
-        const url = u.size ? `?${u}` : location.pathname
+        if (this.place && this.radius !== WALK) {
+            u.set('r', this.radius)
+        }
+
+        return u.size ? `?${u}` : location.pathname
+    },
+
+    save() {
+        const url = this.url()
 
         if (url !== (location.search || location.pathname)) {
             history.pushState(null, '', url)
@@ -332,36 +443,46 @@ export const finder = (today) => ({
         const lat = parseFloat(u.get('lat'))
         const lon = parseFloat(u.get('lon'))
         const day = u.get('day')
+        const r = parseInt(u.get('r'), 10)
+        const id = u.get('l')
 
         this.day = DAYS[day] ? day : this.today
+
+        if (RADII.includes(r)) {
+            this.radius = r
+        }
 
         if (Number.isNaN(lat) || Number.isNaN(lon)) {
             this.place = null
             this.q = ''
             this.reset()
+
+            if (id) {
+                this.mode = 'line'
+                await this.open(id, false)
+            }
+
             return
         }
 
         const same = this.place && this.place.lat.toFixed(6) === lat.toFixed(6) && this.place.lon.toFixed(6) === lon.toFixed(6)
 
         if (!same) {
-            await this.pick({ name: u.get('n') || 'Local escolhido', label: u.get('d') || '', lat, lon }, false)
+            await this.pick({ name: u.get('n') || 'Ponto no mapa', label: u.get('d') || '', lat, lon }, false)
         } else {
             this.load()
         }
-
-        const id = u.get('l')
 
         if (id) {
             await this.open(id, false)
         } else if (this.detail) {
             this.detail = null
-            this.draw((v) => v.place(this.place, this.me))
+            this.draw((v) => v.place(this.place, this.me, this.radius))
         }
     },
 
     meters(m) {
-        return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`
+        return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.0', '').replace('.', ',')} km`
     },
 
     walking(m) {

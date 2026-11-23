@@ -4,23 +4,43 @@
     <main x-data="finder({{ Js::from($today) }})" class="mx-auto flex min-h-dvh max-w-7xl flex-col lg:grid lg:h-dvh lg:grid-cols-[minmax(360px,440px)_1fr] lg:grid-rows-[auto_1fr] lg:gap-x-6 lg:p-6">
         <header class="px-4 pt-6 pb-4 lg:col-start-1 lg:row-start-1 lg:px-0 lg:pt-2">
             <a href="/" x-on:click.prevent="clear()" class="inline-block text-3xl font-bold tracking-tight">passa lá<span class="text-sun">?</span></a>
-            <p x-show="!place" class="mt-1 text-mute">Digita pra onde você vai e a gente mostra os ônibus que passam a até 1 km de lá.</p>
+            <p x-show="!place && !detail" class="mt-1 text-mute">Digita pra onde você vai e a gente mostra os ônibus que passam a até 1 km de lá.</p>
 
-            <form x-on:submit.prevent="first()" role="search" class="relative mt-4">
-                <label for="q" class="sr-only">Pra onde você vai?</label>
+            <div role="group" aria-label="Buscar por" class="mt-4 flex w-fit rounded-full border border-edge bg-card p-1 text-sm">
+                <x-ui.button variant="ghost" x-on:click="swap('place')" x-bind:aria-pressed="mode === 'place'" x-bind:class="mode === 'place' && 'bg-fg text-paper hover:bg-fg hover:text-paper'">
+                    <x-icon name="pin" class="size-4" /> Lugar
+                </x-ui.button>
+                <x-ui.button variant="ghost" x-on:click="swap('line')" x-bind:aria-pressed="mode === 'line'" x-bind:class="mode === 'line' && 'bg-fg text-paper hover:bg-fg hover:text-paper'">
+                    <x-icon name="bus" class="size-4" /> Linha
+                </x-ui.button>
+            </div>
+
+            <form x-on:submit.prevent="first()" role="search" class="relative mt-3">
+                <label for="q" class="sr-only" x-text="mode === 'line' ? 'Qual linha?' : 'Pra onde você vai?'">Pra onde você vai?</label>
                 <div class="flex items-center gap-2 rounded-2xl border border-edge bg-card pr-2 pl-4 shadow-sm focus-within:border-fg/50">
                     <x-icon name="search" class="size-5 shrink-0 text-mute" />
                     <input id="q" x-ref="q" x-model="q" x-on:input="type()" x-on:focus="menu = places.length > 0" x-on:keydown.escape="menu = false"
-                        type="search" enterkeyhint="search" autocomplete="off" placeholder="Ex.: Shopping Patteo Olinda"
+                        type="search" enterkeyhint="search" autocomplete="off" x-bind:placeholder="hint()" placeholder="Ex.: Shopping Patteo Olinda"
                         class="h-14 w-full min-w-0 bg-transparent text-lg outline-none placeholder:text-mute/70 [&::-webkit-search-cancel-button]:hidden">
-                    <span x-show="busy === 'places'" x-cloak class="size-4 shrink-0 animate-spin rounded-full border-2 border-edge border-t-fg"></span>
+                    <span x-show="busy === 'search'" x-cloak class="size-4 shrink-0 animate-spin rounded-full border-2 border-edge border-t-fg"></span>
                     <x-ui.button variant="ghost" x-show="q" x-cloak x-on:click="clear()" aria-label="Limpar busca" class="px-2">
                         <x-icon name="close" class="size-4" />
                     </x-ui.button>
                 </div>
 
                 <ul x-show="menu" x-cloak x-on:click.outside="menu = false" class="absolute inset-x-0 top-full z-20 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-edge bg-card p-1 shadow-lg">
-                    <template x-for="p in places" x-bind:key="p.lat + ',' + p.lon">
+                    <template x-for="l in mode === 'line' ? found : []" x-bind:key="'l' + l.id">
+                        <li>
+                            <x-ui.button variant="row" x-on:click="line(l)" class="gap-3">
+                                <x-ui.code x-text="l.code" />
+                                <span class="min-w-0">
+                                    <span class="block truncate font-medium" x-text="l.name"></span>
+                                    <span class="block truncate text-xs text-mute first-letter:uppercase" x-text="l.agency"></span>
+                                </span>
+                            </x-ui.button>
+                        </li>
+                    </template>
+                    <template x-for="p in mode === 'place' ? places : []" x-bind:key="p.lat + ',' + p.lon">
                         <li>
                             <x-ui.button variant="row" x-on:click="pick(p)" class="gap-3">
                                 <x-icon name="pin" class="size-5 shrink-0 text-mute" />
@@ -31,11 +51,19 @@
                             </x-ui.button>
                         </li>
                     </template>
-                    <li x-show="!places.length" class="px-3 py-3 text-sm text-mute">Não achei esse lugar em Pernambuco. Tenta outro nome.</li>
+                    <li x-show="mode === 'place' && !places.length" class="px-3 py-3 text-sm text-mute">
+                        Não achei esse lugar em Pernambuco. Tenta outro nome ou
+                        <button type="button" x-on:click="target()" class="cursor-pointer font-medium text-fg underline">marca no mapa</button>.
+                    </li>
+                    <li x-show="mode === 'line' && !found.length" class="px-3 py-3 text-sm text-mute">Nenhuma linha com esse número ou nome.</li>
                 </ul>
             </form>
 
-            <div x-show="geo === 'ask' || geo === 'busy'" x-cloak class="mt-3 flex items-start gap-3 rounded-2xl border border-edge bg-card p-4">
+            <x-ui.button variant="ghost" x-show="mode === 'place' && !place && !aim && !detail" x-on:click="target()" class="mt-2 -ml-3 text-sm">
+                <x-icon name="pin" class="size-4" /> Escolher no mapa
+            </x-ui.button>
+
+            <div x-show="(geo === 'ask' || geo === 'busy') && !detail" x-cloak class="mt-3 flex items-start gap-3 rounded-2xl border border-edge bg-card p-4">
                 <x-icon name="walk" class="mt-0.5 size-5 shrink-0 text-mute" />
                 <div class="min-w-0 flex-1">
                     <p class="text-sm">Quer usar sua localização? A gente mostra a parada mais perto de você e o caminho a pé até ela.</p>
@@ -48,16 +76,16 @@
                 </div>
             </div>
 
-            <div x-show="!place && recents.length" x-cloak class="mt-5">
+            <div x-show="!place && !detail && recents.length" x-cloak class="mt-5">
                 <p class="text-sm font-medium text-mute">Ônibus recentes</p>
                 <ul class="mt-1 divide-y divide-edge">
-                    <template x-for="r in recents" x-bind:key="r.line.id + r.place.name">
+                    <template x-for="r in recents" x-bind:key="r.line.id + (r.place?.name ?? '')">
                         <li>
                             <x-ui.button variant="row" x-on:click="again(r)" class="gap-3 px-0">
                                 <x-ui.code x-text="r.line.code" />
                                 <span class="min-w-0 flex-1">
                                     <span class="block truncate font-medium" x-text="r.line.name"></span>
-                                    <span class="block truncate text-xs text-mute" x-text="'perto de ' + r.place.name"></span>
+                                    <span class="block truncate text-xs text-mute" x-text="r.place ? 'perto de ' + r.place.name : 'busca por linha'"></span>
                                 </span>
                             </x-ui.button>
                         </li>
@@ -68,13 +96,19 @@
             <p x-show="fail" x-text="fail" x-cloak class="mt-3 rounded-xl bg-alert/10 px-3 py-2 text-sm text-alert"></p>
         </header>
 
-        <section x-bind:class="place ? (detail ? 'h-[55dvh]' : 'h-56') : 'hidden'" class="relative lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:h-auto">
+        <section x-bind:class="detail ? 'h-[55dvh]' : aim ? 'h-[60dvh]' : place ? 'h-56' : 'hidden'" class="relative lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:h-auto">
             <div x-ref="map" class="size-full overflow-hidden lg:rounded-3xl lg:border lg:border-edge"></div>
+            <div x-show="aim" x-cloak class="pointer-events-none absolute inset-x-0 bottom-10 flex justify-center px-3">
+                <div class="pointer-events-auto flex items-center gap-2 rounded-full bg-ink py-1.5 pr-1.5 pl-4 text-sm text-white shadow-lg">
+                    Toque no mapa pra marcar o destino
+                    <button type="button" x-on:click="aim = false" class="cursor-pointer rounded-full bg-white/15 px-3 py-1 hover:bg-white/25">Cancelar</button>
+                </div>
+            </div>
         </section>
 
         <section class="flex flex-1 flex-col px-4 lg:col-start-1 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:px-0">
-            <template x-if="place">
-                <div role="group" aria-label="Dia da semana" class="flex gap-2 pt-4">
+            <template x-if="place || detail">
+                <div role="group" aria-label="Dia da semana" class="flex flex-wrap gap-2 pt-4">
                     <template x-for="(v, k) in days" x-bind:key="k">
                         <x-ui.button variant="chip" x-on:click="pickDay(k)" x-bind:aria-pressed="day === k"
                             x-bind:class="{ 'border-fg bg-fg text-paper hover:border-fg': day === k, 'line-through opacity-50': !runs(k) }">
@@ -86,17 +120,31 @@
 
             <template x-if="place && !detail">
                 <div class="pb-6">
+                    <div role="group" aria-label="Distância" class="flex items-center gap-2 pt-2">
+                        <span class="text-sm text-mute">Até</span>
+                        <template x-for="r in radii" x-bind:key="r">
+                            <x-ui.button variant="chip" x-on:click="resize(r)" x-bind:aria-pressed="radius === r"
+                                x-bind:class="radius === r && 'border-fg bg-fg text-paper hover:border-fg'">
+                                <span x-text="meters(r)"></span>
+                            </x-ui.button>
+                        </template>
+                    </div>
+
                     <div class="py-4">
                         <p class="truncate font-semibold" x-text="place.name"></p>
                         <p class="truncate text-sm text-mute" x-text="place.label"></p>
+                        <p class="mt-1 text-xs text-mute">Toque no mapa pra mudar o ponto.</p>
                     </div>
 
                     <p x-show="busy === 'lines'" class="text-sm text-mute">Procurando linhas…</p>
-                    <p x-show="busy !== 'lines' && hits.length" class="mb-2 text-sm text-mute">
-                        <strong class="text-fg" x-text="count()"></strong> a até 1 km daqui <span x-text="days[day].when"></span>
+                    <p x-show="busy !== 'lines' && hits.length && !wide" class="mb-2 text-sm text-mute">
+                        <strong class="text-fg" x-text="count()"></strong> a até <span x-text="meters(radius)"></span> daqui <span x-text="days[day].when"></span>
+                    </p>
+                    <p x-show="busy !== 'lines' && hits.length && wide" class="mb-2 rounded-2xl border border-dashed border-edge p-4 text-sm text-mute">
+                        Nenhum ônibus passa a até <span x-text="meters(radius)"></span> daqui <span x-text="days[day].when"></span>. Os mais perto:
                     </p>
                     <div x-show="busy !== 'lines' && !hits.length && !fail" class="rounded-2xl border border-dashed border-edge p-5 text-center text-sm text-mute">
-                        Nenhum ônibus passa a até 1 km daqui <span x-text="days[day].when"></span>. Por enquanto a gente só cobre a Região Metropolitana do Recife.
+                        Nenhum ônibus a até 5 km daqui <span x-text="days[day].when"></span>. Por enquanto a gente só cobre a Região Metropolitana do Recife.
                     </div>
 
                     <ul class="divide-y divide-edge">
@@ -122,7 +170,7 @@
             <template x-if="detail">
                 <div class="space-y-4 py-4">
                     <x-ui.button variant="ghost" x-on:click="close()" class="-ml-3">
-                        <x-icon name="back" class="size-4" /> Voltar pra lista
+                        <x-icon name="back" class="size-4" /> <span x-text="place ? 'Voltar pra lista' : 'Voltar'"></span>
                     </x-ui.button>
 
                     <div class="flex items-start gap-3">
