@@ -50,12 +50,14 @@ export const finder = (today) => ({
     chosen: null,
     walk: null,
     recents: [],
+    favs: [],
 
     init() {
         this.map = import('./map/view').then(
             ({ View }) => new View(this.$refs.map, { stop: (id) => this.board(id), tap: (p) => this.tap(p) }),
         )
         this.recents = store.get('recent', [])
+        this.favs = store.get('fav', [])
         this.geo = store.get('geo', 'ask')
         this.radius = RADII.includes(store.get('radius')) ? store.get('radius') : WALK
 
@@ -351,6 +353,35 @@ export const finder = (today) => ({
     skip() {
         this.geo = 'off'
         store.set('geo', 'off')
+    },
+
+    fav(id) {
+        return this.favs.find((f) => f.id === id) ?? null
+    },
+
+    star(l) {
+        this.favs = this.fav(l.id)
+            ? this.favs.filter((f) => f.id !== l.id)
+            : [...this.favs, { id: l.id, code: l.code, name: l.name, nick: '' }]
+        store.set('fav', this.favs)
+    },
+
+    rename(id, nick) {
+        this.favs = this.favs.map((f) => (f.id === id ? { ...f, nick: nick.trim().slice(0, 30) } : f))
+        store.set('fav', this.favs)
+    },
+
+    nick(id) {
+        return this.fav(id)?.nick ?? ''
+    },
+
+    ranked() {
+        return [...this.hits].sort((a, b) => Number(!this.fav(a.line.id)) - Number(!this.fav(b.line.id)))
+    },
+
+    mine() {
+        const n = this.hits.filter((h) => this.fav(h.line.id)).length
+        return n === 1 ? '1 favorita sua passa aqui' : `${n} favoritas suas passam aqui`
     },
 
     remember() {

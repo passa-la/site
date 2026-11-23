@@ -34,7 +34,7 @@
                             <x-ui.button variant="row" x-on:click="line(l)" class="gap-3">
                                 <x-ui.code x-text="l.code" />
                                 <span class="min-w-0">
-                                    <span class="block truncate font-medium" x-text="l.name"></span>
+                                    <span class="block truncate font-medium" x-text="nick(l.id) ? `${nick(l.id)} · ${l.name}` : l.name"></span>
                                     <span class="block truncate text-xs text-mute first-letter:uppercase" x-text="l.agency"></span>
                                 </span>
                             </x-ui.button>
@@ -76,12 +76,30 @@
                 </div>
             </div>
 
+            <div x-show="!place && !detail && favs.length" x-cloak class="mt-5">
+                <p class="text-sm font-medium text-mute">Favoritas</p>
+                <ul class="mt-1 divide-y divide-edge">
+                    <template x-for="f in favs" x-bind:key="'f' + f.id">
+                        <li>
+                            <x-ui.button variant="row" x-on:click="line(f)" class="-mx-3 w-[calc(100%+1.5rem)] gap-3">
+                                <x-ui.code x-text="f.code" />
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate font-medium" x-text="f.nick || f.name"></span>
+                                    <span x-show="f.nick" class="block truncate text-xs text-mute" x-text="f.name"></span>
+                                </span>
+                                <x-icon name="star" class="size-4 shrink-0 fill-current text-sun" />
+                            </x-ui.button>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+
             <div x-show="!place && !detail && recents.length" x-cloak class="mt-5">
                 <p class="text-sm font-medium text-mute">Ônibus recentes</p>
                 <ul class="mt-1 divide-y divide-edge">
                     <template x-for="r in recents" x-bind:key="r.line.id + (r.place?.name ?? '')">
                         <li>
-                            <x-ui.button variant="row" x-on:click="again(r)" class="gap-3 px-0">
+                            <x-ui.button variant="row" x-on:click="again(r)" class="-mx-3 w-[calc(100%+1.5rem)] gap-3">
                                 <x-ui.code x-text="r.line.code" />
                                 <span class="min-w-0 flex-1">
                                     <span class="block truncate font-medium" x-text="r.line.name"></span>
@@ -124,12 +142,24 @@
                         <div class="flex items-start gap-3">
                             <x-ui.code x-text="detail.line.code" class="text-lg" />
                             <div class="min-w-0 flex-1">
+                                <p x-show="nick(detail.line.id)" class="text-xs font-semibold tracking-wide text-sun uppercase" x-text="nick(detail.line.id)"></p>
                                 <h2 class="text-xl leading-tight font-semibold" x-text="detail.line.name"></h2>
                                 <p class="text-sm text-mute first-letter:uppercase" x-text="detail.line.agency"></p>
                             </div>
+                            <x-ui.button variant="ghost" x-on:click="star(detail.line)" x-bind:aria-pressed="!!fav(detail.line.id)"
+                                x-bind:aria-label="fav(detail.line.id) ? 'Tirar das favoritas' : 'Favoritar'" class="-mt-1 px-2">
+                                <x-icon name="star" class="size-5" x-bind:class="fav(detail.line.id) && 'fill-current text-sun'" />
+                            </x-ui.button>
                             <x-ui.button variant="ghost" x-on:click="close()" aria-label="Fechar linha" class="-mt-1 -mr-2 px-2">
                                 <x-icon name="close" class="size-5" />
                             </x-ui.button>
+                        </div>
+
+                        <div x-show="fav(detail.line.id)" class="flex items-center gap-3 rounded-2xl border border-edge bg-card px-4 py-1.5">
+                            <label for="nick" class="shrink-0 text-xs font-medium tracking-wide text-mute uppercase">Apelido</label>
+                            <input id="nick" type="text" maxlength="30" placeholder="Ex.: trabalho, casa da vó" autocomplete="off"
+                                x-bind:value="nick(detail.line.id)" x-on:input.debounce.400ms="rename(detail.line.id, $event.target.value)"
+                                class="h-9 w-full min-w-0 bg-transparent outline-none placeholder:text-mute/70">
                         </div>
 
                         <p x-show="!detail.runs" class="rounded-2xl border border-dashed border-edge p-4 text-sm text-mute">
@@ -211,24 +241,34 @@
                     <p x-show="busy !== 'lines' && hits.length && wide" class="mb-2 rounded-2xl border border-dashed border-edge p-4 text-sm text-mute">
                         Nenhum ônibus passa a até <span x-text="meters(radius)"></span> daqui <span x-text="days[day].when"></span>. Os mais perto:
                     </p>
+                    <p x-show="busy !== 'lines' && hits.some((h) => fav(h.line.id))" class="mb-2 flex items-center gap-1.5 text-sm font-medium">
+                        <x-icon name="star" class="size-4 fill-current text-sun" /> <span x-text="mine()"></span>
+                    </p>
                     <div x-show="busy !== 'lines' && !hits.length && !fail" class="rounded-2xl border border-dashed border-edge p-5 text-center text-sm text-mute">
                         Nenhum ônibus a até 5 km daqui <span x-text="days[day].when"></span>. Por enquanto a gente só cobre a Região Metropolitana do Recife.
                     </div>
 
                     <ul class="divide-y divide-edge">
-                        <template x-for="h in hits" x-bind:key="h.line.id">
-                            <li>
+                        <template x-for="h in ranked()" x-bind:key="h.line.id">
+                            <li class="flex items-center gap-1">
                                 <x-ui.button variant="row" x-on:click="open(h.line.id)" x-bind:disabled="busy === 'line'" x-bind:aria-current="detail?.line.id === h.line.id"
-                                    x-bind:class="detail?.line.id === h.line.id && 'bg-edge/70 ring-1 ring-fg/20'" class="-mx-3 w-[calc(100%+1.5rem)] gap-3">
+                                    x-bind:class="detail?.line.id === h.line.id && 'bg-edge/70 ring-1 ring-fg/20'" class="-ml-3 min-w-0 flex-1 gap-3">
                                     <x-ui.code x-text="h.line.code" />
                                     <span class="min-w-0 flex-1">
-                                        <span class="block truncate font-medium" x-text="h.line.name"></span>
+                                        <span class="flex min-w-0 items-center gap-1.5">
+                                            <span x-show="nick(h.line.id)" class="shrink-0 rounded-md bg-sun/20 px-1.5 text-xs font-semibold" x-text="nick(h.line.id)"></span>
+                                            <span class="truncate font-medium" x-text="h.line.name"></span>
+                                        </span>
                                         <span class="block truncate text-xs text-mute first-letter:uppercase" x-text="h.line.agency"></span>
                                     </span>
                                     <span class="shrink-0 text-right">
                                         <span class="block text-sm font-semibold tabular-nums" x-text="meters(h.meters)"></span>
                                         <span class="block text-xs text-mute" x-text="walking(h.meters)"></span>
                                     </span>
+                                </x-ui.button>
+                                <x-ui.button variant="ghost" x-on:click="star(h.line)" x-bind:aria-pressed="!!fav(h.line.id)"
+                                    x-bind:aria-label="fav(h.line.id) ? 'Tirar das favoritas' : 'Favoritar'" class="-mr-2 shrink-0 px-2">
+                                    <x-icon name="star" class="size-5" x-bind:class="fav(h.line.id) && 'fill-current text-sun'" />
                                 </x-ui.button>
                             </li>
                         </template>
