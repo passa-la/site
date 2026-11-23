@@ -285,11 +285,23 @@
                 </div>
             </template>
 
-            <footer class="mt-auto border-t border-edge py-4 text-xs text-mute">
-                Linhas: <a href="https://www.granderecife.pe.gov.br" class="underline hover:text-fg">Grande Recife</a> (GTFS, atualizado toda semana) ·
-                Mapa: <a href="https://openfreemap.org" class="underline hover:text-fg">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" class="underline hover:text-fg">OpenStreetMap</a> ·
-                Caminho a pé: <a href="https://routing.openstreetmap.de" class="underline hover:text-fg">FOSSGIS</a> ·
-                <a href="https://github.com/passa-la/site" class="underline hover:text-fg">Código aberto</a>
+            <footer class="mt-auto space-y-3 border-t border-edge py-5 text-xs text-mute">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="flex min-w-0 items-center gap-2">
+                        <span class="size-2 shrink-0 rounded-full bg-sun"></span>
+                        <span>
+                            Linhas do <a href="https://www.granderecife.pe.gov.br" class="font-medium text-fg/80 hover:text-fg hover:underline">Grande Recife</a>@if ($fresh), atualizadas em {{ $fresh }}@endif
+                        </span>
+                    </p>
+                    <a href="https://github.com/passa-la/site" class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-edge px-3 py-1.5 font-medium text-fg/80 transition hover:border-fg/40 hover:text-fg">
+                        <x-icon name="code" class="size-3.5" /> Código aberto
+                    </a>
+                </div>
+                <p class="flex flex-wrap gap-x-3 gap-y-1 leading-relaxed">
+                    <span class="whitespace-nowrap">Mapa <a href="https://openfreemap.org" class="text-fg/80 hover:text-fg hover:underline">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" class="text-fg/80 hover:text-fg hover:underline">OpenStreetMap</a></span>
+                    <span class="whitespace-nowrap">Busca <a href="https://photon.komoot.io" class="text-fg/80 hover:text-fg hover:underline">Photon</a></span>
+                    <span class="whitespace-nowrap">A pé <a href="https://routing.openstreetmap.de" class="text-fg/80 hover:text-fg hover:underline">FOSSGIS</a></span>
+                </p>
             </footer>
         </section>
     </main>
