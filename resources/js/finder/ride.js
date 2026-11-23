@@ -91,7 +91,6 @@ export const ride = () => ({
         this.write(f, this.spotName(p))
         this.menu = false
         this.places = []
-        this.aiming = null
 
         if (f === 'from' && !this.ends.to) {
             this.field = 'to'
@@ -151,6 +150,7 @@ export const ride = () => ({
     },
 
     async ride(r) {
+        this.aiming = null
         this.chosen = r.board.stop.id
         await this.open(r.line.id)
     },

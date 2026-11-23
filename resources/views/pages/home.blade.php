@@ -51,18 +51,22 @@
             </form>
 
             <form x-show="mode === 'ride'" x-cloak x-on:submit.prevent x-on:keydown.escape="menu = false; aiming = null" role="search" class="relative mt-3">
-                <div class="relative rounded-2xl border border-edge bg-card shadow-sm focus-within:border-fg/50">
-                    <label class="flex items-center gap-3 rounded-t-2xl border-b border-edge pr-14 pl-4 transition" x-bind:class="aiming === 'from' && 'ring-2 ring-sun ring-inset'">
-                        <span class="w-9 shrink-0 text-xs font-semibold tracking-wide text-mute uppercase">De</span>
-                        <input x-ref="qa" x-model="qa" x-on:input="typeEnd('from')" x-on:focus="aimAt('from')" type="search" autocomplete="off"
-                            placeholder="De onde você sai?" class="h-12 w-full min-w-0 bg-transparent outline-none placeholder:text-mute/70 [&::-webkit-search-cancel-button]:hidden">
-                    </label>
-                    <label class="flex items-center gap-3 rounded-b-2xl pr-14 pl-4 transition" x-bind:class="aiming === 'to' && 'ring-2 ring-sun ring-inset'">
-                        <span class="w-9 shrink-0 text-xs font-semibold tracking-wide text-mute uppercase">Para</span>
-                        <input x-ref="qb" x-model="qb" x-on:input="typeEnd('to')" x-on:focus="aimAt('to')" type="search" autocomplete="off"
-                            placeholder="Pra onde você vai?" class="h-12 w-full min-w-0 bg-transparent outline-none placeholder:text-mute/70 [&::-webkit-search-cancel-button]:hidden">
-                    </label>
-                    <x-ui.button variant="ghost" x-on:click="flip()" aria-label="Inverter origem e destino" class="absolute top-1/2 right-2 -translate-y-1/2 px-2">
+                <div class="flex items-center gap-2">
+                    <div class="min-w-0 flex-1 space-y-2">
+                        <label class="flex items-center gap-3 rounded-2xl border bg-card px-4 shadow-sm transition"
+                            x-bind:class="aiming === 'from' ? 'border-sun ring-1 ring-sun' : 'border-edge'">
+                            <span class="w-9 shrink-0 text-xs font-semibold tracking-wide text-mute uppercase">De</span>
+                            <input x-ref="qa" x-model="qa" x-on:input="typeEnd('from')" x-on:focus="aimAt('from')" type="search" autocomplete="off"
+                                placeholder="De onde você sai?" class="h-12 w-full min-w-0 bg-transparent outline-none placeholder:text-mute/70 [&::-webkit-search-cancel-button]:hidden">
+                        </label>
+                        <label class="flex items-center gap-3 rounded-2xl border bg-card px-4 shadow-sm transition"
+                            x-bind:class="aiming === 'to' ? 'border-sun ring-1 ring-sun' : 'border-edge'">
+                            <span class="w-9 shrink-0 text-xs font-semibold tracking-wide text-mute uppercase">Para</span>
+                            <input x-ref="qb" x-model="qb" x-on:input="typeEnd('to')" x-on:focus="aimAt('to')" type="search" autocomplete="off"
+                                placeholder="Pra onde você vai?" class="h-12 w-full min-w-0 bg-transparent outline-none placeholder:text-mute/70 [&::-webkit-search-cancel-button]:hidden">
+                        </label>
+                    </div>
+                    <x-ui.button variant="ghost" x-on:click="flip()" aria-label="Inverter origem e destino" class="-mr-2 shrink-0 px-2">
                         <x-icon name="swap" class="size-5" />
                     </x-ui.button>
                 </div>
@@ -150,7 +154,8 @@
         </header>
 
         <section x-bind:class="detail ? 'h-[55dvh]' : picking() ? 'h-[60dvh]' : place || (mode === 'ride' && (ends.from || ends.to)) ? 'h-56' : 'hidden'" class="relative lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:h-auto lg:py-3 lg:pr-3">
-            <div x-ref="map" x-bind:class="picking() && 'pick ring-2 ring-sun'" class="size-full overflow-hidden transition lg:rounded-3xl lg:border lg:border-edge"></div>
+            <div x-ref="map" x-bind:class="picking() && 'pick'" class="size-full overflow-hidden lg:rounded-3xl lg:border lg:border-edge lg:[clip-path:inset(0_round_1.5rem)]"></div>
+            <div x-show="picking()" x-cloak class="pointer-events-none absolute inset-0 border-2 border-sun lg:inset-y-3 lg:right-3 lg:left-0 lg:rounded-3xl"></div>
             <div x-show="picking()" x-cloak class="pointer-events-none absolute inset-x-0 bottom-10 flex justify-center px-3">
                 <div class="pointer-events-auto flex items-center gap-2 rounded-full bg-ink py-1.5 pr-1.5 pl-4 text-sm text-white shadow-lg">
                     <span x-text="pickHint()"></span>
@@ -270,7 +275,7 @@
 
                     <ul class="divide-y divide-edge">
                         <template x-for="r in rides" x-bind:key="'r' + r.line.id">
-                            <x-line line="r.line" note="`${r.hops} paradas · anda ${meters(r.board.meters)} + ${meters(r.drop.meters)}`" x-on:click="ride(r)" x-bind:disabled="busy === 'line'">
+                            <x-line line="r.line" note="`${r.hops} ${r.hops === 1 ? 'parada' : 'paradas'} · anda ${meters(r.board.meters)} + ${meters(r.drop.meters)}`" x-on:click="ride(r)" x-bind:disabled="busy === 'line'">
                                 <span class="shrink-0 text-right">
                                     <span class="block text-sm font-semibold tabular-nums" x-text="meters(r.walk)"></span>
                                     <span class="block text-xs text-mute">a pé</span>
