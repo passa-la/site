@@ -80,14 +80,16 @@
                 <p class="text-sm font-medium text-mute">Favoritas</p>
                 <ul class="mt-1 divide-y divide-edge">
                     <template x-for="f in favs" x-bind:key="'f' + f.id">
-                        <li>
-                            <x-ui.button variant="row" x-on:click="line(f)" class="-mx-3 w-[calc(100%+1.5rem)] gap-3">
+                        <li class="flex items-center gap-1">
+                            <x-ui.button variant="row" x-on:click="line(f)" class="-ml-3 min-w-0 flex-1 gap-3">
                                 <x-ui.code x-text="f.code" />
                                 <span class="min-w-0 flex-1">
                                     <span class="block truncate font-medium" x-text="f.nick || f.name"></span>
                                     <span x-show="f.nick" class="block truncate text-xs text-mute" x-text="f.name"></span>
                                 </span>
-                                <x-icon name="star" class="size-4 shrink-0 fill-current text-sun" />
+                            </x-ui.button>
+                            <x-ui.button variant="ghost" x-on:click="star(f)" aria-pressed="true" aria-label="Tirar das favoritas" class="-mr-2 shrink-0 px-2">
+                                <x-icon name="star" class="size-5 fill-current text-sun" />
                             </x-ui.button>
                         </li>
                     </template>
@@ -98,13 +100,20 @@
                 <p class="text-sm font-medium text-mute">Ônibus recentes</p>
                 <ul class="mt-1 divide-y divide-edge">
                     <template x-for="r in recents" x-bind:key="r.line.id + (r.place?.name ?? '')">
-                        <li>
-                            <x-ui.button variant="row" x-on:click="again(r)" class="-mx-3 w-[calc(100%+1.5rem)] gap-3">
+                        <li class="flex items-center gap-1">
+                            <x-ui.button variant="row" x-on:click="again(r)" class="-ml-3 min-w-0 flex-1 gap-3">
                                 <x-ui.code x-text="r.line.code" />
                                 <span class="min-w-0 flex-1">
-                                    <span class="block truncate font-medium" x-text="r.line.name"></span>
+                                    <span class="flex min-w-0 items-center gap-1.5">
+                                        <span x-show="nick(r.line.id)" class="shrink-0 rounded-md bg-sun/20 px-1.5 text-xs font-semibold" x-text="nick(r.line.id)"></span>
+                                        <span class="truncate font-medium" x-text="r.line.name"></span>
+                                    </span>
                                     <span class="block truncate text-xs text-mute" x-text="r.place ? 'perto de ' + r.place.name : 'busca por linha'"></span>
                                 </span>
+                            </x-ui.button>
+                            <x-ui.button variant="ghost" x-on:click="star(r.line)" x-bind:aria-pressed="!!fav(r.line.id)"
+                                x-bind:aria-label="fav(r.line.id) ? 'Tirar das favoritas' : 'Favoritar'" class="-mr-2 shrink-0 px-2">
+                                <x-icon name="star" class="size-5" x-bind:class="fav(r.line.id) && 'fill-current text-sun'" />
                             </x-ui.button>
                         </li>
                     </template>
