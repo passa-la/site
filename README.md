@@ -17,6 +17,8 @@ Por enquanto cobre a Região Metropolitana do Recife (Pernambuco).
    mostra onde pegar e o caminho a pé até lá, pelo roteador do [FOSSGIS](https://routing.openstreetmap.de).
    Tocando em outra parada no mapa, ela vira o embarque.
 5. Também dá pra buscar a linha direto, pelo número ou pelo nome.
+6. No modo De → Para, a pessoa escolhe origem e destino (lugares salvos, busca, mapa ou a própria
+   localização) e vê as linhas que levam direto de um ao outro, sem baldeação.
 
 As linhas vêm do [GTFS do Grande Recife](https://www.granderecife.pe.gov.br/gtfs/gtfs.zip).
 O comando `gtfs:sync` baixa o feed (só quando o ETag muda), importa só as linhas de ônibus com
@@ -58,6 +60,7 @@ Pública, sem autenticação, em `/api/v1`. É a mesma que o app mobile vai usar
 | `GET /lines?lat=-7.99&lon=-34.84&day=sunday&radius=500` | linhas no raio que rodam no dia, com a parada mais próxima e a distância; `meta.wide` indica que nada passava no raio e vieram as mais perto |
 | `GET /lines/search?q=823` | linhas pelo número ou pelo nome |
 | `GET /lines/{id}?day=&lat=&lon=&from_lat=&from_lon=&stop=` | ida e volta do dia (GeoJSON e paradas em ordem), onde pegar e onde descer em cada sentido e o sentido recomendado |
+| `GET /rides?from_lat=&from_lon=&lat=&lon=&day=&radius=` | linhas diretas entre dois pontos, com onde pegar, onde descer, caminhada e número de paradas |
 | `GET /walk?from_lat=&from_lon=&lat=&lon=` | caminho a pé (GeoJSON), metros e minutos |
 
 `day` aceita `weekday`, `saturday` ou `sunday` e, sem ele, vale o dia de hoje no horário do Recife.
@@ -70,7 +73,7 @@ pra embarcar. A posição da pessoa não é gravada e o nginx não loga as rotas
 ```
 app/
   Domain/   regras puras, sem Laravel (Geo, Transit)
-  Cases/    casos de uso: Lookup, Pin, Search, Find, Show, Sync, Walk
+  Cases/    casos de uso: Lookup, Pin, Search, Find, Show, Trip, Sync, Walk
   Infra/    PostGIS, leitor GTFS, Photon, OSRM
   Http/Api/ controllers, requests e JSON
 resources/js/

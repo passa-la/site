@@ -1,5 +1,7 @@
 import { api } from './api'
 import { store } from './store'
+import { marks } from './finder/marks'
+import { ride } from './finder/ride'
 
 const WAIT = 300
 const PACE = 75
@@ -22,9 +24,12 @@ const WAYS = ['Ida', 'Volta']
 const HINTS = {
     place: 'Ex.: Shopping Patteo Olinda',
     line: 'Ex.: 823 ou Jardim Brasil',
+    ride: '',
 }
 
 export const finder = (today) => ({
+    ...marks(),
+    ...ride(),
     q: '',
     mode: 'place',
     places: [],
@@ -51,7 +56,6 @@ export const finder = (today) => ({
     chosen: null,
     walk: null,
     recents: [],
-    favs: [],
 
     init() {
         this.map = import('./map/view').then(
@@ -59,6 +63,7 @@ export const finder = (today) => ({
         )
         this.recents = store.get('recent', [])
         this.favs = store.get('fav', [])
+        this.spots = store.get('spots', [])
         this.geo = store.get('geo', 'ask')
         this.radius = RADII.includes(store.get('radius')) ? store.get('radius') : WALK
 
@@ -94,11 +99,30 @@ export const finder = (today) => ({
             this.like(this.detail.line)
         }
 
+        if (mode === 'ride') {
+            this.into()
+            return
+        }
+
         this.$nextTick(() => this.$refs.q.focus())
     },
 
+    into() {
+        const to = this.place ?? this.ends.to
+        const from = this.ends.from ?? (this.me ? { name: 'Minha localização', label: '', lat: this.me.lat, lon: this.me.lon, here: true } : null)
+
+        this.place = null
+        this.hits = []
+        this.ends = { from, to }
+        this.qa = this.spotName(from)
+        this.qb = this.spotName(to)
+        this.field = from ? 'to' : 'from'
+        this.trips()
+        this.$nextTick(() => (from ? this.$refs.qb : this.$refs.qa).focus())
+    },
+
     home() {
-        return !this.place && !this.detail && !(this.mode === 'line' && this.q.trim())
+        return !this.place && !this.detail && this.mode !== 'ride' && !(this.mode === 'line' && this.q.trim())
     },
 
     heading() {
@@ -216,12 +240,31 @@ export const finder = (today) => ({
         }
     },
 
+    async name(at, done) {
+        try {
+            const named = await api.reverse(at)
+            done({ ...named, lat: at.lat, lon: at.lon, pin: true })
+            history.replaceState(null, '', this.url())
+        } catch {}
+    },
+
     async tap(p) {
-        if (this.detail || (!this.aim && !this.place && !desk())) {
+        if (this.detail || (!this.aim && !this.place && this.mode !== 'ride' && !desk())) {
             return
         }
 
         const at = { name: 'Ponto no mapa', label: '', lat: p.lat, lon: p.lon, pin: true }
+
+        if (this.mode === 'ride') {
+            const f = this.aiming ?? this.field
+            await this.setEnd(at, f)
+            this.name(at, (named) => {
+                this.ends = { ...this.ends, [f]: named }
+                this.write(f, named.name)
+            })
+            return
+        }
+
         this.mode = 'place'
         await this.pick(at)
 
@@ -251,7 +294,9 @@ export const finder = (today) => ({
         store.set('radius', r)
         this.save()
 
-        if (this.place) {
+        if (this.mode === 'ride') {
+            await this.trips(false)
+        } else if (this.place) {
             this.draw((v) => v.place(this.place, this.me, r))
             await this.load()
         }
@@ -262,10 +307,10 @@ export const finder = (today) => ({
         this.fail = ''
 
         try {
-            const me = this.me
+            const me = this.origin()
             this.detail = await this.fetch(id)
 
-            if (this.me !== me) {
+            if (this.origin() !== me) {
                 this.detail = await this.fetch(id)
             }
 
@@ -294,7 +339,7 @@ export const finder = (today) => ({
     },
 
     fetch(id) {
-        return api.line(id, { day: this.day, to: this.place, from: this.me, stop: this.chosen })
+        return api.line(id, { day: this.day, to: this.dest(), from: this.origin(), stop: this.chosen })
     },
 
     async refresh() {
@@ -333,12 +378,12 @@ export const finder = (today) => ({
         this.walk = null
         this.paint(fit)
 
-        if (!this.me || !way?.board) {
+        if (!this.origin() || !way?.board) {
             return
         }
 
         try {
-            this.walk = await api.walk(this.me, way.board.stop)
+            this.walk = await api.walk(this.origin(), way.board.stop)
             this.paint(false)
         } catch {
             this.walk = null
@@ -351,8 +396,8 @@ export const finder = (today) => ({
         }
 
         const ctx = {
-            place: this.place,
-            me: this.me,
+            place: this.dest(),
+            me: this.origin(),
             way: this.way(),
             focus: this.focus,
             walk: this.walk,
@@ -372,6 +417,17 @@ export const finder = (today) => ({
         this.chosen = null
         this.save()
 
+        if (this.mode === 'ride') {
+            const open = this.detail?.line.id
+            await this.trips(false)
+
+            if (open) {
+                await this.open(open, false)
+            }
+
+            return
+        }
+
         if (this.place) {
             this.load()
         }
@@ -381,7 +437,7 @@ export const finder = (today) => ({
         }
     },
 
-    locate() {
+    locate(done) {
         if (!navigator.geolocation) {
             this.geo = 'off'
             return
@@ -394,7 +450,9 @@ export const finder = (today) => ({
                 this.geo = 'on'
                 store.set('geo', 'on')
 
-                if (this.detail && this.busy !== 'line') {
+                if (done) {
+                    done()
+                } else if (this.detail && this.busy !== 'line' && this.mode !== 'ride') {
                     this.refresh()
                 } else if (this.place) {
                     this.draw((v) => v.spot(this.me))
@@ -413,39 +471,11 @@ export const finder = (today) => ({
         store.set('geo', 'off')
     },
 
-    fav(id) {
-        return this.favs.find((f) => f.id === id) ?? null
-    },
-
-    star(l) {
-        this.favs = this.fav(l.id)
-            ? this.favs.filter((f) => f.id !== l.id)
-            : [...this.favs, { id: l.id, code: l.code, name: l.name, nick: '' }]
-        store.set('fav', this.favs)
-    },
-
-    rename(id, nick) {
-        this.favs = this.favs.map((f) => (f.id === id ? { ...f, nick: nick.trim().slice(0, 30) } : f))
-        store.set('fav', this.favs)
-    },
-
-    nick(id) {
-        return this.fav(id)?.nick ?? ''
-    },
-
-    ranked() {
-        return [...this.hits].sort((a, b) => Number(!this.fav(a.line.id)) - Number(!this.fav(b.line.id)))
-    },
-
-    mine() {
-        const n = this.hits.filter((h) => this.fav(h.line.id)).length
-        return n === 1 ? '1 favorita sua passa aqui' : `${n} favoritas suas passam aqui`
-    },
-
     remember() {
         const d = this.detail
-        const item = { line: { id: d.line.id, code: d.line.code, name: d.line.name }, place: this.place }
-        const same = (r) => r.line.id === d.line.id && r.place?.name === this.place?.name
+        const place = this.dest()
+        const item = { line: { id: d.line.id, code: d.line.code, name: d.line.name }, place }
+        const same = (r) => r.line.id === d.line.id && r.place?.name === place?.name
 
         this.recents = [item, ...this.recents.filter((r) => !same(r))].slice(0, KEEP)
         store.set('recent', this.recents)
@@ -467,6 +497,12 @@ export const finder = (today) => ({
         this.chosen = null
         this.walk = null
         this.focus = null
+
+        if (this.mode === 'ride') {
+            this.save()
+            this.draw((v) => this.both() && v.pair(this.ends.from, this.ends.to, this.radius))
+            return
+        }
 
         if (!this.place) {
             this.save()
@@ -511,14 +547,21 @@ export const finder = (today) => ({
 
     url() {
         const u = new URLSearchParams()
+        const to = this.dest()
+        const from = this.mode === 'ride' ? this.ends.from : null
 
-        if (this.place) {
-            u.set('lat', this.place.lat.toFixed(6))
-            u.set('lon', this.place.lon.toFixed(6))
-            u.set('n', this.place.name)
+        if (from) {
+            u.set('de', `${from.lat.toFixed(6)},${from.lon.toFixed(6)}`)
+            u.set('dn', from.name)
+        }
 
-            if (this.place.label) {
-                u.set('d', this.place.label)
+        if (to) {
+            u.set('lat', to.lat.toFixed(6))
+            u.set('lon', to.lon.toFixed(6))
+            u.set('n', to.name)
+
+            if (to.label) {
+                u.set('d', to.label)
             }
         }
 
@@ -530,7 +573,7 @@ export const finder = (today) => ({
             u.set('day', this.day)
         }
 
-        if (this.place && this.radius !== WALK) {
+        if (to && this.radius !== WALK) {
             u.set('r', this.radius)
         }
 
@@ -559,6 +602,24 @@ export const finder = (today) => ({
             this.radius = r
         }
 
+        if (u.get('de')) {
+            const [flat, flon] = u.get('de').split(',').map(parseFloat)
+            const to = Number.isNaN(lat) ? null : { name: u.get('n') || 'Ponto no mapa', label: u.get('d') || '', lat, lon }
+
+            this.mode = 'ride'
+            this.place = null
+            this.ends = { from: { name: u.get('dn') || 'Ponto no mapa', label: '', lat: flat, lon: flon }, to }
+            this.qa = this.spotName(this.ends.from)
+            this.qb = this.spotName(to)
+            await this.trips(false)
+
+            if (id) {
+                await this.open(id, false)
+            }
+
+            return
+        }
+
         if (Number.isNaN(lat) || Number.isNaN(lon)) {
             this.place = null
             this.q = ''
@@ -570,6 +631,10 @@ export const finder = (today) => ({
             }
 
             return
+        }
+
+        if (this.mode === 'ride') {
+            this.mode = 'place'
         }
 
         const same = this.place && this.place.lat.toFixed(6) === lat.toFixed(6) && this.place.lon.toFixed(6) === lon.toFixed(6)
@@ -620,8 +685,10 @@ export const finder = (today) => ({
             return ''
         }
 
+        const who = this.mode === 'ride' ? this.spotName(this.ends.from) : 'você'
+
         return this.walk
-            ? `${this.meters(this.walk.meters)} de você · ${this.walk.minutes} min a pé`
-            : `${this.meters(w.board.meters)} de você`
+            ? `${this.meters(this.walk.meters)} de ${who} · ${this.walk.minutes} min a pé`
+            : `${this.meters(w.board.meters)} de ${who}`
     },
 })

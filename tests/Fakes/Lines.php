@@ -13,7 +13,13 @@ final class Lines implements Port
         private array $lines,
         private array $stops,
         private array $ways = [],
+        private array $halts = [],
     ) {}
+
+    public function halts(Circle $c, Day $d): array
+    {
+        return $this->halts;
+    }
 
     public function around(Circle $c, Day $d): array
     {

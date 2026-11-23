@@ -8,6 +8,8 @@ interface Lines
 {
     public function around(Circle $c, Day $d): array;
 
+    public function halts(Circle $c, Day $d): array;
+
     public function many(array $ids): array;
 
     public function find(string $id): ?Line;

@@ -5,6 +5,7 @@ namespace App\Infra\Db;
 use App\Domain\Geo\Circle;
 use App\Domain\Geo\Point;
 use App\Domain\Transit\Day;
+use App\Domain\Transit\Halt;
 use App\Domain\Transit\Line;
 use App\Domain\Transit\Lines as Port;
 use App\Domain\Transit\Stop;
@@ -38,6 +39,20 @@ final readonly class Lines implements Port
         );
 
         return array_map(fn (object $r) => $this->stop($r, json_decode($r->lines, true)), $rows);
+    }
+
+    public function halts(Circle $c, Day $d): array
+    {
+        $rows = $this->db->select(
+            self::STOP.', ls.line_id, ls.dir, ls.seq
+            from stops s
+            join line_stop ls on ls.stop_id = s.id
+            where ls.days & ? > 0
+            and st_dwithin(s.geom, st_point(?, ?, 4326)::geography, ?)',
+            [Mask::bit($d), $c->center->lon, $c->center->lat, $c->meters + self::SLACK],
+        );
+
+        return array_map(fn (object $r) => new Halt($this->stop($r), $r->line_id, (int) $r->dir, (int) $r->seq), $rows);
     }
 
     public function many(array $ids): array
