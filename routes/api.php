@@ -2,6 +2,7 @@
 
 use App\Http\Api\Lines;
 use App\Http\Api\Places;
+use App\Http\Api\Rides;
 use App\Http\Api\Walks;
 use Illuminate\Support\Facades\Route;
 
@@ -11,5 +12,6 @@ Route::middleware('throttle:api')->group(function () {
     Route::get('lines', [Lines::class, 'index']);
     Route::get('lines/search', [Lines::class, 'search']);
     Route::get('lines/{id}', [Lines::class, 'show']);
+    Route::get('rides', Rides::class);
     Route::get('walk', Walks::class);
 });
