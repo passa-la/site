@@ -35,7 +35,21 @@
         -webkit-tap-highlight-color: transparent;
     }
 
+    .fan {
+        z-index: 0;
+        width: 120px;
+        height: 120px;
+        color: var(--color-sun);
+        pointer-events: none;
+    }
+
+    .fan svg {
+        width: 100%;
+        height: 100%;
+    }
+
     .me {
+        z-index: 1;
         display: grid;
         place-items: center;
         width: 32px;

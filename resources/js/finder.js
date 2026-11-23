@@ -5,6 +5,8 @@ import { ride } from './finder/ride'
 import { sheet } from './finder/sheet'
 import { install } from './finder/install'
 import { desk } from './screen'
+import { compass } from './map/compass'
+import { gap } from './map/shape'
 
 const WAIT = 300
 const PACE = 75
@@ -14,6 +16,8 @@ const RADII = [300, 500, 1000]
 const MIN = { place: 3, line: 1 }
 const SIDE = 390
 const TICK = 30000
+const ASTRAY = 35
+const REROUTE = 15000
 
 
 const DAYS = {
@@ -63,6 +67,9 @@ export const finder = (today) => ({
     table: false,
     tick: Date.now(),
     got: 0,
+    watcher: null,
+    walked: 0,
+    slack: 0,
     walk: null,
     recents: [],
 
@@ -82,6 +89,8 @@ export const finder = (today) => ({
         }
 
         window.addEventListener('popstate', () => this.restore())
+        document.addEventListener('visibilitychange', () => this.wake())
+        compass((deg) => this.map.then((v) => v.heading(deg)))
         setInterval(() => this.beat(), TICK)
         this.restore()
     },
@@ -421,7 +430,9 @@ export const finder = (today) => ({
         }
 
         try {
-            this.walk = await api.walk(this.origin(), way.board.stop)
+            const from = this.origin()
+            this.walk = await api.walk(from, way.board.stop)
+            this.slack = gap(this.walk.geometry.coordinates, from)
             this.paint(false)
         } catch {
             this.walk = null
@@ -481,10 +492,23 @@ export const finder = (today) => ({
             return
         }
 
-        this.geo = 'busy'
-        navigator.geolocation.getCurrentPosition(
+        let first = true
+        this.halt()
+
+        if (!this.me) {
+            this.geo = 'busy'
+        }
+
+        this.watcher = navigator.geolocation.watchPosition(
             (pos) => {
-                this.me = { lat: pos.coords.latitude, lon: pos.coords.longitude }
+                this.me = { lat: pos.coords.latitude, lon: pos.coords.longitude, here: true }
+
+                if (!first) {
+                    this.move()
+                    return
+                }
+
+                first = false
                 this.geo = 'on'
                 store.set('geo', 'on')
 
@@ -497,11 +521,53 @@ export const finder = (today) => ({
                 }
             },
             (err) => {
+                if (!first && err.code !== err.PERMISSION_DENIED) {
+                    return
+                }
+
+                this.halt()
                 this.geo = err.code === err.PERMISSION_DENIED ? 'denied' : 'off'
                 store.set('geo', 'off')
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
         )
+    },
+
+    halt() {
+        if (this.watcher !== null) {
+            navigator.geolocation.clearWatch(this.watcher)
+            this.watcher = null
+        }
+    },
+
+    wake() {
+        if (document.hidden) {
+            this.halt()
+        } else if (this.geo === 'on' && this.watcher === null) {
+            this.locate()
+        }
+    },
+
+    move() {
+        const live = this.mode !== 'ride' || this.ends.from?.here
+
+        if (this.mode === 'ride' && live) {
+            this.ends.from = { ...this.ends.from, lat: this.me.lat, lon: this.me.lon }
+        }
+
+        if (!live) {
+            return
+        }
+
+        const me = this.origin()
+        this.map.then((v) => v.move(me))
+
+        const coords = this.walk?.geometry?.coordinates
+
+        if (coords?.length && !this.busy && Date.now() - this.walked > REROUTE && gap(coords, me) > this.slack + ASTRAY) {
+            this.walked = Date.now()
+            this.route(false)
+        }
     },
 
     skip() {

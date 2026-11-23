@@ -21,6 +21,14 @@ const person = () => {
     return el
 }
 
+const fan = () => {
+    const el = document.createElement('div')
+    el.className = 'fan'
+    el.innerHTML =
+        '<svg viewBox="0 0 120 120" aria-hidden="true"><defs><radialGradient id="fan-fade" cx="60" cy="60" r="60" gradientUnits="userSpaceOnUse"><stop offset="0.2" stop-color="currentColor" stop-opacity="0.95"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></radialGradient></defs><path d="M60 60L34.6 5.6A60 60 0 0 1 85.4 5.6Z" fill="url(#fan-fade)" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5"/></svg>'
+    return el
+}
+
 const all = (features) => ({ type: 'FeatureCollection', features })
 
 export class View {
@@ -40,6 +48,10 @@ export class View {
         }
         this.pin = new gl.Marker({ color: tone('ink') })
         this.me = new gl.Marker({ element: person() })
+        this.fan = new gl.Marker({ element: fan(), rotationAlignment: 'map', pitchAlignment: 'map' })
+        this.at = null
+        this.dir = null
+        this.aimed = false
         this.stop = stop
         this.tap = tap
         this.ready = new Promise((ok) => this.map.on('load', () => ok(this.layers())))
@@ -141,10 +153,46 @@ export class View {
     }
 
     spot(me) {
+        this.at = me ?? null
+
         if (me) {
             this.me.setLngLat([me.lon, me.lat]).addTo(this.map)
         } else {
             this.me.remove()
+        }
+
+        this.aim()
+    }
+
+    move(me) {
+        if (!this.at?.here) {
+            return
+        }
+
+        this.at = me
+        this.me.setLngLat([me.lon, me.lat])
+        this.aim()
+    }
+
+    heading(deg) {
+        this.dir = deg
+        this.aim()
+    }
+
+    aim() {
+        const p = this.at
+
+        if (!p?.here || this.dir === null) {
+            this.fan.remove()
+            this.aimed = false
+            return
+        }
+
+        this.fan.setLngLat([p.lon, p.lat]).setRotation(this.dir)
+
+        if (!this.aimed) {
+            this.fan.addTo(this.map)
+            this.aimed = true
         }
     }
 
