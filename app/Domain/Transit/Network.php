@@ -7,6 +7,7 @@ final readonly class Network
     public function __construct(
         public array $lines,
         public array $stops,
+        public array $links,
         public array $paths,
     ) {}
 

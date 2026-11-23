@@ -4,10 +4,12 @@ namespace App\Infra\Db;
 
 use App\Domain\Geo\Circle;
 use App\Domain\Geo\Point;
+use App\Domain\Transit\Day;
 use App\Domain\Transit\Line;
 use App\Domain\Transit\Lines as Port;
-use App\Domain\Transit\Path;
 use App\Domain\Transit\Stop;
+use App\Domain\Transit\Way;
+use App\Infra\Mask;
 use Illuminate\Database\ConnectionInterface;
 
 final readonly class Lines implements Port
@@ -20,15 +22,16 @@ final readonly class Lines implements Port
         private ConnectionInterface $db,
     ) {}
 
-    public function around(Circle $c): array
+    public function around(Circle $c, Day $d): array
     {
         $rows = $this->db->select(
-            self::STOP.', json_agg(ls.line_id) as lines
+            self::STOP.', json_agg(distinct ls.line_id) as lines
             from stops s
             join line_stop ls on ls.stop_id = s.id
-            where st_dwithin(s.geom, st_point(?, ?, 4326)::geography, ?)
+            where ls.days & ? > 0
+            and st_dwithin(s.geom, st_point(?, ?, 4326)::geography, ?)
             group by s.id',
-            [$c->center->lon, $c->center->lat, $c->meters + self::SLACK],
+            [Mask::bit($d), $c->center->lon, $c->center->lat, $c->meters + self::SLACK],
         );
 
         return array_map(fn (object $r) => $this->stop($r, json_decode($r->lines, true)), $rows);
@@ -54,33 +57,43 @@ final readonly class Lines implements Port
         return $r ? $this->line($r) : null;
     }
 
-    public function stops(string $id): array
+    public function ways(string $id, Day $d): array
     {
+        $bit = Mask::bit($d);
+        $stops = [];
+        $points = [];
+
         $rows = $this->db->select(
-            self::STOP.' from stops s join line_stop ls on ls.stop_id = s.id where ls.line_id = ? order by s.id',
-            [$id],
+            self::STOP.', ls.dir from line_stop ls join stops s on s.id = ls.stop_id
+            where ls.line_id = ? and ls.days & ? > 0 order by ls.dir, ls.seq',
+            [$id, $bit],
         );
 
-        return array_map(fn (object $r) => $this->stop($r), $rows);
-    }
+        foreach ($rows as $r) {
+            $stops[(int) $r->dir][] = $this->stop($r);
+        }
 
-    public function paths(string $id): array
-    {
-        $rows = $this->db->select(
-            'select dir, st_asgeojson(geom::geometry, 6) as geo from paths where line_id = ? order by dir',
-            [$id],
+        $paths = $this->db->select(
+            'select dir, st_asgeojson(geom::geometry, 6) as geo from paths where line_id = ? and days & ? > 0 order by dir',
+            [$id, $bit],
         );
 
-        return array_map(fn (object $r) => new Path(
-            $id,
-            (int) $r->dir,
-            array_map(fn (array $c) => new Point($c[1], $c[0]), json_decode($r->geo, true)['coordinates']),
-        ), $rows);
+        foreach ($paths as $r) {
+            $points[(int) $r->dir] = array_map(
+                fn (array $c) => new Point($c[1], $c[0]),
+                json_decode($r->geo, true)['coordinates'],
+            );
+        }
+
+        $dirs = array_unique([...array_keys($stops), ...array_keys($points)]);
+        sort($dirs);
+
+        return array_map(fn (int $dir) => new Way($dir, $points[$dir] ?? [], $stops[$dir] ?? []), $dirs);
     }
 
     private function line(object $r): Line
     {
-        return new Line($r->id, $r->code, $r->name, $r->agency);
+        return new Line($r->id, $r->code, $r->name, $r->agency, Mask::days((int) $r->days));
     }
 
     private function stop(object $r, array $lines = []): Stop

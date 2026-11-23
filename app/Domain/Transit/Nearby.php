@@ -10,11 +10,11 @@ final readonly class Nearby
         private Lines $lines,
     ) {}
 
-    public function of(Circle $c): array
+    public function of(Circle $c, Day $d): array
     {
         $stops = [];
 
-        foreach ($this->lines->around($c) as $s) {
+        foreach ($this->lines->around($c, $d) as $s) {
             if (! $c->has($s->point)) {
                 continue;
             }

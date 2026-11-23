@@ -4,6 +4,7 @@ namespace App\Cases;
 
 use App\Domain\Geo\Circle;
 use App\Domain\Geo\Point;
+use App\Domain\Transit\Day;
 use App\Domain\Transit\Nearby;
 
 final readonly class Search
@@ -12,8 +13,8 @@ final readonly class Search
         private Nearby $nearby,
     ) {}
 
-    public function __invoke(Point $p): array
+    public function __invoke(Point $p, Day $d): array
     {
-        return $this->nearby->of(new Circle($p));
+        return $this->nearby->of(new Circle($p), $d);
     }
 }

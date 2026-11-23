@@ -3,9 +3,10 @@
 namespace App\Cases;
 
 use App\Domain\Geo\Point;
+use App\Domain\Transit\Day;
 use App\Domain\Transit\Detail;
 use App\Domain\Transit\Lines;
-use App\Domain\Transit\Pass;
+use App\Domain\Transit\Plan;
 
 final readonly class Show
 {
@@ -13,7 +14,7 @@ final readonly class Show
         private Lines $lines,
     ) {}
 
-    public function __invoke(string $id, ?Point $from = null): ?Detail
+    public function __invoke(string $id, Day $day, ?Point $to = null, ?Point $from = null, ?string $stop = null): ?Detail
     {
         $line = $this->lines->find($id);
 
@@ -21,13 +22,8 @@ final readonly class Show
             return null;
         }
 
-        $stops = $this->lines->stops($id);
+        $ways = $this->lines->ways($id, $day);
 
-        return new Detail(
-            $line,
-            $this->lines->paths($id),
-            $stops,
-            $from ? Pass::best($line, $stops, $from) : null,
-        );
+        return new Detail($line, $day, $ways, Plan::of($ways, $to, $from, $stop));
     }
 }
