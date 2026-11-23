@@ -4,6 +4,7 @@ use App\Cases\Sync;
 use App\Domain\Transit\Change;
 use App\Domain\Transit\Store;
 use App\Infra\Gtfs\Reader;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
@@ -241,4 +242,28 @@ it('syncs only when the feed tag changes', function () {
 
     $this->assertDatabaseHas('syncs', ['tag' => '"t2"']);
     Http::assertSent(fn ($r) => $r->header('If-None-Match') === ['"t2"']);
+});
+
+it('writes a report of what changed in the feed', function () {
+    $file = tempnam(sys_get_temp_dir(), 'report');
+    Http::fake(['*' => Http::sequence()
+        ->push(file_get_contents(gtfs()), 200, ['ETag' => '"t3"'])
+        ->push('', 304)]);
+    DB::table('lines')->where('code', '200')->delete();
+
+    $this->artisan('gtfs:sync', ['--report' => $file])->assertSuccessful();
+
+    expect(file_get_contents($file))
+        ->toContain('Feed `v-test` · 2 linhas de ônibus')
+        ->toContain('**Entraram (1):** 200')
+        ->toContain('**Saíram:** nenhuma')
+        ->toContain('<!-- changed -->');
+
+    $this->artisan('gtfs:sync', ['--report' => $file])->assertSuccessful();
+
+    expect(file_get_contents($file))
+        ->toContain('O feed não mudou')
+        ->not->toContain('<!-- changed -->');
+
+    unlink($file);
 });

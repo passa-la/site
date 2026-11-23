@@ -1,0 +1,81 @@
+name: Linhas do Grande Recife
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Importar mesmo se o feed não mudou
+        type: boolean
+        default: false
+
+concurrency:
+  group: gtfs
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DB_URL: ${{ secrets.DB_URL }}
+    steps:
+      - name: Conferir o banco de produção
+        id: ready
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::notice title=Sem banco::Cadastre o secret DB_URL (Settings → Secrets and variables → Actions) pra ativar a atualização."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ok == 'true'
+
+      - uses: shivammathur/setup-php@v2
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          php-version: '8.5'
+          extensions: pdo_pgsql, zip, intl
+          coverage: none
+
+      - name: Instalar dependências
+        if: steps.ready.outputs.ok == 'true'
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress
+
+      - name: Importar as linhas
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          APP_ENV: production
+          DB_CONNECTION: pgsql
+          CACHE_STORE: array
+          LOG_CHANNEL: stderr
+          FORCE: ${{ inputs.force }}
+        run: |
+          key="$(openssl rand -base64 32)"
+          export APP_KEY="base64:$key"
+
+          if [ "$FORCE" = "true" ]; then
+            php artisan gtfs:sync --report=report.md --force
+          else
+            php artisan gtfs:sync --report=report.md
+          fi
+
+      - name: Resumo
+        if: steps.ready.outputs.ok == 'true'
+        run: cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Abrir issue quando as linhas mudam
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if grep -q '<!-- changed -->' report.md; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "Linhas mudaram ($(date -u +%Y-%m-%d))" --body-file report.md
+          fi
