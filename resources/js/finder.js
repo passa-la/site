@@ -256,7 +256,7 @@ export const finder = (today) => ({
         const at = { name: 'Ponto no mapa', label: '', lat: p.lat, lon: p.lon, pin: true }
 
         if (this.mode === 'ride') {
-            const f = this.field
+            const f = this.aiming ?? this.field
             await this.setEnd(at, f)
             this.name(at, (named) => {
                 this.ends = { ...this.ends, [f]: named }

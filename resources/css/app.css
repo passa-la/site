@@ -65,3 +65,11 @@
         display: none !important;
     }
 }
+
+.pick .maplibregl-canvas-container.maplibregl-interactive {
+    cursor: pointer;
+}
+
+.pick .maplibregl-canvas-container.maplibregl-interactive:active {
+    cursor: grabbing;
+}

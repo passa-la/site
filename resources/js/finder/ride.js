@@ -6,6 +6,7 @@ const WAIT = 300
 export const ride = () => ({
     ends: { from: null, to: null },
     field: 'to',
+    aiming: null,
     qa: '',
     qb: '',
     rides: [],
@@ -16,6 +17,29 @@ export const ride = () => ({
 
     dest() {
         return this.mode === 'ride' ? this.ends.to : this.place
+    },
+
+    aimAt(f) {
+        this.field = f
+        this.aiming = f
+        this.menu = f === 'from' || this.places.length > 0
+    },
+
+    picking() {
+        return this.aim || (this.mode === 'ride' && !!this.aiming && !this.detail)
+    },
+
+    pickHint() {
+        if (this.mode !== 'ride') {
+            return 'Toque no mapa pra marcar o destino'
+        }
+
+        return this.aiming === 'from' ? 'Toque no mapa pra marcar a origem' : 'Toque no mapa pra marcar o destino'
+    },
+
+    stopAim() {
+        this.aim = false
+        this.aiming = null
     },
 
     text(f) {
@@ -67,6 +91,7 @@ export const ride = () => ({
         this.write(f, this.spotName(p))
         this.menu = false
         this.places = []
+        this.aiming = null
 
         if (f === 'from' && !this.ends.to) {
             this.field = 'to'
