@@ -6,15 +6,18 @@ use App\Domain\Geo\Point;
 use App\Domain\Transit\Day;
 use App\Domain\Transit\Detail;
 use App\Domain\Transit\Lines;
+use App\Domain\Transit\Moment;
 use App\Domain\Transit\Plan;
+use App\Domain\Transit\Timetable;
 
 final readonly class Show
 {
     public function __construct(
         private Lines $lines,
+        private Timetable $timetable,
     ) {}
 
-    public function __invoke(string $id, Day $day, ?Point $to = null, ?Point $from = null, ?string $stop = null): ?Detail
+    public function __invoke(string $id, Day $day, Moment $now, ?Point $to = null, ?Point $from = null, ?string $stop = null, ?string $end = null): ?Detail
     {
         $line = $this->lines->find($id);
 
@@ -23,7 +26,17 @@ final readonly class Show
         }
 
         $ways = $this->lines->ways($id, $day);
+        $plan = Plan::of($ways, $to, $from, $stop, $end);
+        $tables = [];
 
-        return new Detail($line, $day, $ways, Plan::of($ways, $to, $from, $stop));
+        foreach ($plan->legs as $l) {
+            $t = $this->timetable->of($id, $l, $day, $now);
+
+            if ($t) {
+                $tables[$l->dir] = $t;
+            }
+        }
+
+        return new Detail($line, $day, $ways, $plan, $tables);
     }
 }

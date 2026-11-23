@@ -41,3 +41,21 @@ it('accepts any boarding on a single direction line', function () {
 
     expect(Plan::of($loop, $this->home, $this->work, null)->best)->toBe(0);
 });
+
+it('gets off at the stop the rider chose', function () {
+    $plan = Plan::of($this->ways, null, null, 'a', 'c');
+
+    expect($plan->best)->toBe(0)
+        ->and($plan->legs[0]->drop->stop->id)->toBe('c')
+        ->and($plan->legs[0]->fits())->toBeTrue()
+        ->and($plan->legs[1]->drop->stop->id)->toBe('c')
+        ->and($plan->legs[1]->fits())->toBeFalse();
+});
+
+it('never boards at the last stop of a direction', function () {
+    $plan = Plan::of($this->ways, null, null, 'c');
+
+    expect($plan->best)->toBe(1)
+        ->and($plan->legs[0]->board)->toBeNull()
+        ->and($plan->legs[1]->board->stop->id)->toBe('c');
+});

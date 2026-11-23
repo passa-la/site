@@ -9,5 +9,6 @@ final readonly class Detail
         public Day $day,
         public array $ways,
         public Plan $plan,
+        public array $tables = [],
     ) {}
 }

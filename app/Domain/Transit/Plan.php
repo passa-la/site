@@ -11,9 +11,13 @@ final readonly class Plan
         public ?int $best,
     ) {}
 
-    public static function of(array $ways, ?Point $to, ?Point $from, ?string $stop): self
+    public static function of(array $ways, ?Point $to, ?Point $from, ?string $stop, ?string $end = null): self
     {
-        $legs = array_map(fn (Way $w) => new Leg($w->dir, $w->pick($stop, $from), $w->near($to)), $ways);
+        $legs = array_map(function (Way $w) use ($to, $from, $stop, $end) {
+            $board = $w->pick($stop, $from);
+
+            return new Leg($w->dir, $board, $w->drop($end, $to, $board));
+        }, $ways);
 
         return new self($legs, self::best($legs, $stop));
     }

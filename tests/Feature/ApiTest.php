@@ -267,3 +267,53 @@ it('writes a report of what changed in the feed', function () {
 
     unlink($file);
 });
+
+it('shows the next buses at the stop the rider tapped', function () {
+    $this->travelTo(new DateTimeImmutable('2026-11-23 05:30', new DateTimeZone('America/Recife')));
+
+    $this->getJson('/api/v1/lines/100?stop=S1')
+        ->assertOk()
+        ->assertJsonPath('data.best', 0)
+        ->assertJsonPath('data.ways.0.times.stop', 'S1')
+        ->assertJsonPath('data.ways.0.times.end', null)
+        ->assertJsonPath('data.ways.0.times.ride', null)
+        ->assertJsonPath('data.ways.0.times.next', [['at' => '06:00', 'in' => 30, 'end' => null], ['at' => '07:00', 'in' => 90, 'end' => null]])
+        ->assertJsonPath('data.ways.0.times.all', ['05:00', '06:00', '07:00'])
+        ->assertJsonPath('data.ways.1.times', null);
+});
+
+it('tells when the bus gets to the stop the rider gets off', function () {
+    $this->travelTo(new DateTimeImmutable('2026-11-23 05:30', new DateTimeZone('America/Recife')));
+
+    $this->getJson('/api/v1/lines/100?stop=S1&end=S3')
+        ->assertOk()
+        ->assertJsonPath('data.ways.0.drop.stop.id', 'S3')
+        ->assertJsonPath('data.ways.0.fits', true)
+        ->assertJsonPath('data.ways.0.times.end', 'S3')
+        ->assertJsonPath('data.ways.0.times.ride', 10)
+        ->assertJsonPath('data.ways.0.times.next', [['at' => '06:00', 'in' => 30, 'end' => '06:10']])
+        ->assertJsonPath('data.ways.0.times.all', ['05:00', '06:00']);
+});
+
+it('keeps the late night buses of the day before', function () {
+    $this->travelTo(new DateTimeImmutable('2026-11-24 00:20', new DateTimeZone('America/Recife')));
+
+    $this->getJson('/api/v1/lines/100?stop=S3')
+        ->assertJsonPath('data.best', 1)
+        ->assertJsonPath('data.ways.1.times.next.*.at', ['00:30', '06:00', '00:30'])
+        ->assertJsonPath('data.ways.1.times.next.0.in', 10)
+        ->assertJsonPath('data.ways.1.times.all', ['06:00', '00:30']);
+});
+
+it('shows only the table on another day', function () {
+    $this->travelTo(new DateTimeImmutable('2026-11-29 10:00', new DateTimeZone('America/Recife')));
+
+    $this->getJson('/api/v1/lines/100?day=weekday&stop=S1')
+        ->assertJsonPath('data.ways.0.times.next', null)
+        ->assertJsonPath('data.ways.0.times.all', ['05:00', '06:00', '07:00']);
+});
+
+it('has no times without a boarding stop', function () {
+    $this->getJson('/api/v1/lines/100?day=weekday')
+        ->assertJsonPath('data.ways.0.times', null);
+});

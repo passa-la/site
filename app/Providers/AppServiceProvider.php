@@ -8,6 +8,7 @@ use App\Domain\Geo\Point;
 use App\Domain\Geo\Region;
 use App\Domain\Geo\Walker;
 use App\Domain\Transit\Lines;
+use App\Domain\Transit\Schedule;
 use App\Domain\Transit\Source;
 use App\Domain\Transit\Store;
 use App\Infra\Db;
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(Lines::class, Db\Lines::class);
         $this->app->bind(Store::class, Db\Store::class);
+        $this->app->bind(Schedule::class, Db\Schedule::class);
 
         $this->app->bind(Source::class, fn (Application $app) => new Gtfs\Source(
             $app->make(Factory::class),

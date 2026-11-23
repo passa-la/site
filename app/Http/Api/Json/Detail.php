@@ -3,6 +3,7 @@
 namespace App\Http\Api\Json;
 
 use App\Domain\Transit\Leg;
+use App\Domain\Transit\Table as Model;
 use App\Domain\Transit\Way;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -22,11 +23,11 @@ final class Detail extends JsonResource
             'day' => $this->resource->day->value,
             'runs' => $this->resource->ways !== [],
             'best' => $this->resource->plan->best,
-            'ways' => array_map(fn (Way $w) => $this->way($w, $legs[$w->dir] ?? null), $this->resource->ways),
+            'ways' => array_map(fn (Way $w) => $this->way($w, $legs[$w->dir] ?? null, $this->resource->tables[$w->dir] ?? null), $this->resource->ways),
         ];
     }
 
-    private function way(Way $w, ?Leg $l): array
+    private function way(Way $w, ?Leg $l, ?Model $t): array
     {
         return [
             'dir' => $w->dir,
@@ -38,6 +39,7 @@ final class Detail extends JsonResource
             'board' => $l?->board ? new Spot($l->board) : null,
             'drop' => $l?->drop ? new Spot($l->drop) : null,
             'fits' => $l?->fits() ?? false,
+            'times' => $t ? new Table($t) : null,
         ];
     }
 }

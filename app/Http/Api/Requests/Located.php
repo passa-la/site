@@ -26,6 +26,7 @@ abstract class Located extends FormRequest
             'from_lon' => [$from, 'required_with:from_lat', 'numeric', 'between:-180,180'],
             'day' => ['nullable', Rule::enum(Day::class)],
             'stop' => ['nullable', 'string', 'max:40'],
+            'end' => ['nullable', 'string', 'max:40'],
             'radius' => ['nullable', 'integer', 'between:'.Circle::MIN.','.Circle::WALK],
         ];
     }

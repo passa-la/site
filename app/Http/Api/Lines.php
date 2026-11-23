@@ -5,6 +5,7 @@ namespace App\Http\Api;
 use App\Cases\Find;
 use App\Cases\Search;
 use App\Cases\Show;
+use App\Domain\Transit\Moment;
 use App\Http\Api\Json\Detail;
 use App\Http\Api\Json\Line;
 use App\Http\Api\Json\Pass;
@@ -32,7 +33,15 @@ final class Lines
 
     public function show(string $id, Spot $r, Show $show): Detail
     {
-        $detail = $show($id, $r->day(), $r->point(), $r->origin(), $r->string('stop')->toString() ?: null);
+        $detail = $show(
+            $id,
+            $r->day(),
+            Moment::of(now()->toDateTimeImmutable()),
+            $r->point(),
+            $r->origin(),
+            $r->string('stop')->toString() ?: null,
+            $r->string('end')->toString() ?: null,
+        );
 
         return new Detail($detail ?? abort(404));
     }
