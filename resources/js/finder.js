@@ -3,6 +3,7 @@ import { store } from './store'
 import { marks } from './finder/marks'
 import { ride } from './finder/ride'
 import { sheet } from './finder/sheet'
+import { install } from './finder/install'
 import { desk } from './screen'
 
 const WAIT = 300
@@ -32,6 +33,7 @@ export const finder = (today) => ({
     ...marks(),
     ...ride(),
     ...sheet(),
+    ...install(),
     q: '',
     mode: 'place',
     places: [],
@@ -67,6 +69,7 @@ export const finder = (today) => ({
         this.favs = store.get('fav', [])
         this.spots = store.get('spots', [])
         this.geo = store.get('geo', 'ask')
+        this.watch()
         this.radius = RADII.includes(store.get('radius')) ? store.get('radius') : WALK
 
         if (this.geo === 'on') {
