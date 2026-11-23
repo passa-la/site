@@ -11,6 +11,7 @@ use App\Domain\Transit\Path;
 use App\Domain\Transit\Stop;
 use App\Domain\Transit\Store as Port;
 use App\Infra\Mask;
+use DateTimeImmutable;
 use Illuminate\Database\ConnectionInterface;
 
 final readonly class Store implements Port
@@ -24,6 +25,13 @@ final readonly class Store implements Port
     public function tag(): ?string
     {
         return $this->db->table('syncs')->latest('id')->value('tag');
+    }
+
+    public function when(): ?DateTimeImmutable
+    {
+        $at = $this->db->table('syncs')->latest('id')->value('created_at');
+
+        return $at ? new DateTimeImmutable($at) : null;
     }
 
     public function codes(): array

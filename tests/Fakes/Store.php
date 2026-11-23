@@ -5,6 +5,7 @@ namespace Tests\Fakes;
 use App\Domain\Transit\Change;
 use App\Domain\Transit\Feed;
 use App\Domain\Transit\Store as Port;
+use DateTimeImmutable;
 
 final class Store implements Port
 {
@@ -18,6 +19,11 @@ final class Store implements Port
     public function tag(): ?string
     {
         return $this->last;
+    }
+
+    public function when(): ?DateTimeImmutable
+    {
+        return null;
     }
 
     public function codes(): array
