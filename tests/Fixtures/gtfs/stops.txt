@@ -1,0 +1,5 @@
+stop_id,stop_name,stop_lat,stop_lon,location_type
+S1,S1,-8.0001,-34.8500,0
+S2,Ti Teste - S2 ,-8.0050,-34.8500,0
+S3,S3,-8.0200,-34.8500,0
+S4,S4,-8.1000,-34.9000,0

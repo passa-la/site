@@ -1,0 +1,5 @@
+route_id,agency_id,route_short_name,route_long_name,route_type
+100,A,100,Centro / Praia,3
+200,A,200,Terminal / Shopping,3
+300,A,300,Linha Extinta,3
+M1,A,M1,Metrô,1
