@@ -9,6 +9,9 @@
         'walk' => '<circle cx="13" cy="4.5" r="2"/><path d="m9 21 2.5-6.5L14 17v4"/><path d="M7.5 11.5 10 8h4l2.5 4 2 1"/><path d="m11.5 14.5.8-4.5"/>',
         'star' => '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/>',
         'code' => '<path d="m8 6-6 6 6 6"/><path d="m16 6 6 6-6 6"/>',
+        'bookmark' => '<path d="M6 3.5h12v17l-6-4.2-6 4.2z"/>',
+        'swap' => '<path d="M7 4v16"/><path d="m3 8 4-4 4 4"/><path d="M17 20V4"/><path d="m21 16-4 4-4-4"/>',
+        'route' => '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16"/>',
         'bus' => '<rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16"/><path d="M7 21v-4"/><path d="M17 21v-4"/>',
     ];
 @endphp

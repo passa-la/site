@@ -20,5 +20,6 @@ export const api = {
     lines: (p, day, radius) => get('lines', { ...at(p), day, radius }),
     line: async (id, { day, to, from, stop }) =>
         (await get(`lines/${encodeURIComponent(id)}`, { ...at(to), ...at(from, 'from_'), day, stop })).data,
+    rides: (from, to, day, radius) => get('rides', { ...at(to), ...at(from, 'from_'), day, radius }),
     walk: async (from, to) => (await get('walk', { ...at(to), ...at(from, 'from_') })).data,
 }

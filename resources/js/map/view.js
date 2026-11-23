@@ -156,6 +156,20 @@ export class View {
         this.fit(area.geometry.coordinates[0])
     }
 
+    async pair(a, b, radius) {
+        await this.ready
+
+        this.pin.setLngLat([b.lon, b.lat]).addTo(this.map)
+        this.spot(a)
+        this.set('area', all([circle(a, radius), circle(b, radius)]))
+
+        for (const id of ['walk', 'path', 'stops', 'board', 'drop']) {
+            this.set(id, EMPTY)
+        }
+
+        this.fit([...circle(a, radius).geometry.coordinates[0], ...circle(b, radius).geometry.coordinates[0]])
+    }
+
     async line(d, { place, me, way, focus, walk, radius, side }, fit = true) {
         await this.ready
         const shown = d.ways.filter((w) => focus === null || w.dir === focus)
