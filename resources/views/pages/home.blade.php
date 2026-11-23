@@ -1,9 +1,9 @@
 @extends('layouts.site')
 
 @section('main')
-    <main x-data="finder" class="mx-auto flex min-h-dvh max-w-7xl flex-col lg:grid lg:h-dvh lg:grid-cols-[minmax(360px,440px)_1fr] lg:grid-rows-[auto_1fr] lg:gap-x-6 lg:p-6">
+    <main x-data="finder({{ Js::from($today) }})" class="mx-auto flex min-h-dvh max-w-7xl flex-col lg:grid lg:h-dvh lg:grid-cols-[minmax(360px,440px)_1fr] lg:grid-rows-[auto_1fr] lg:gap-x-6 lg:p-6">
         <header class="px-4 pt-6 pb-4 lg:col-start-1 lg:row-start-1 lg:px-0 lg:pt-2">
-            <a href="/" x-on:click.prevent="reset()" class="inline-block text-3xl font-bold tracking-tight">passa lá<span class="text-sun">?</span></a>
+            <a href="/" x-on:click.prevent="clear()" class="inline-block text-3xl font-bold tracking-tight">passa lá<span class="text-sun">?</span></a>
             <p x-show="!place" class="mt-1 text-mute">Digita pra onde você vai e a gente mostra os ônibus que passam a até 1 km de lá.</p>
 
             <form x-on:submit.prevent="first()" role="search" class="relative mt-4">
@@ -14,7 +14,7 @@
                         type="search" enterkeyhint="search" autocomplete="off" placeholder="Ex.: Shopping Patteo Olinda"
                         class="h-14 w-full min-w-0 bg-transparent text-lg outline-none placeholder:text-mute/70 [&::-webkit-search-cancel-button]:hidden">
                     <span x-show="busy === 'places'" x-cloak class="size-4 shrink-0 animate-spin rounded-full border-2 border-edge border-t-fg"></span>
-                    <x-ui.button variant="ghost" x-show="q" x-cloak x-on:click="reset()" aria-label="Limpar busca" class="px-2">
+                    <x-ui.button variant="ghost" x-show="q" x-cloak x-on:click="clear()" aria-label="Limpar busca" class="px-2">
                         <x-icon name="close" class="size-4" />
                     </x-ui.button>
                 </div>
@@ -35,11 +35,34 @@
                 </ul>
             </form>
 
-            <div x-show="!place" class="mt-4 flex flex-wrap items-center gap-2">
-                <span class="text-sm text-mute">Experimenta:</span>
-                @foreach (['Shopping Patteo Olinda', 'Marco Zero', 'UFPE', 'Shopping Recife'] as $s)
-                    <x-ui.button variant="chip" x-on:click="sample({{ Js::from($s) }})">{{ $s }}</x-ui.button>
-                @endforeach
+            <div x-show="geo === 'ask' || geo === 'busy'" x-cloak class="mt-3 flex items-start gap-3 rounded-2xl border border-edge bg-card p-4">
+                <x-icon name="walk" class="mt-0.5 size-5 shrink-0 text-mute" />
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm">Quer usar sua localização? A gente mostra a parada mais perto de você e o caminho a pé até ela.</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <x-ui.button x-on:click="locate()" x-bind:disabled="geo === 'busy'" class="text-sm">
+                            <span x-text="geo === 'busy' ? 'Localizando…' : 'Usar minha localização'"></span>
+                        </x-ui.button>
+                        <x-ui.button variant="ghost" x-on:click="skip()" class="text-sm">Agora não</x-ui.button>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="!place && recents.length" x-cloak class="mt-5">
+                <p class="text-sm font-medium text-mute">Ônibus recentes</p>
+                <ul class="mt-1 divide-y divide-edge">
+                    <template x-for="r in recents" x-bind:key="r.line.id + r.place.name">
+                        <li>
+                            <x-ui.button variant="row" x-on:click="again(r)" class="gap-3 px-0">
+                                <x-ui.code x-text="r.line.code" />
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate font-medium" x-text="r.line.name"></span>
+                                    <span class="block truncate text-xs text-mute" x-text="'perto de ' + r.place.name"></span>
+                                </span>
+                            </x-ui.button>
+                        </li>
+                    </template>
+                </ul>
             </div>
 
             <p x-show="fail" x-text="fail" x-cloak class="mt-3 rounded-xl bg-alert/10 px-3 py-2 text-sm text-alert"></p>
@@ -50,6 +73,17 @@
         </section>
 
         <section class="flex flex-1 flex-col px-4 lg:col-start-1 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:px-0">
+            <template x-if="place">
+                <div role="group" aria-label="Dia da semana" class="flex gap-2 pt-4">
+                    <template x-for="(v, k) in days" x-bind:key="k">
+                        <x-ui.button variant="chip" x-on:click="pickDay(k)" x-bind:aria-pressed="day === k"
+                            x-bind:class="{ 'border-fg bg-fg text-paper hover:border-fg': day === k, 'line-through opacity-50': !runs(k) }">
+                            <span x-text="v.name"></span><span x-show="k === today" class="text-xs opacity-70">hoje</span>
+                        </x-ui.button>
+                    </template>
+                </div>
+            </template>
+
             <template x-if="place && !detail">
                 <div class="pb-6">
                     <div class="py-4">
@@ -59,10 +93,10 @@
 
                     <p x-show="busy === 'lines'" class="text-sm text-mute">Procurando linhas…</p>
                     <p x-show="busy !== 'lines' && hits.length" class="mb-2 text-sm text-mute">
-                        <strong class="text-fg" x-text="count()"></strong> a até 1 km daqui
+                        <strong class="text-fg" x-text="count()"></strong> a até 1 km daqui <span x-text="days[day].when"></span>
                     </p>
                     <div x-show="busy !== 'lines' && !hits.length && !fail" class="rounded-2xl border border-dashed border-edge p-5 text-center text-sm text-mute">
-                        Nenhum ônibus passa a até 1 km daqui. Por enquanto a gente só cobre a Região Metropolitana do Recife.
+                        Nenhum ônibus passa a até 1 km daqui <span x-text="days[day].when"></span>. Por enquanto a gente só cobre a Região Metropolitana do Recife.
                     </div>
 
                     <ul class="divide-y divide-edge">
@@ -76,7 +110,7 @@
                                     </span>
                                     <span class="shrink-0 text-right">
                                         <span class="block text-sm font-semibold tabular-nums" x-text="meters(h.meters)"></span>
-                                        <span class="block text-xs text-mute" x-text="walk(h.meters)"></span>
+                                        <span class="block text-xs text-mute" x-text="walking(h.meters)"></span>
                                     </span>
                                 </x-ui.button>
                             </li>
@@ -86,12 +120,12 @@
             </template>
 
             <template x-if="detail">
-                <div class="py-4">
+                <div class="space-y-4 py-4">
                     <x-ui.button variant="ghost" x-on:click="close()" class="-ml-3">
                         <x-icon name="back" class="size-4" /> Voltar pra lista
                     </x-ui.button>
 
-                    <div class="mt-3 flex items-start gap-3">
+                    <div class="flex items-start gap-3">
                         <x-ui.code x-text="detail.line.code" class="text-lg" />
                         <div class="min-w-0">
                             <h2 class="text-xl leading-tight font-semibold" x-text="detail.line.name"></h2>
@@ -99,17 +133,54 @@
                         </div>
                     </div>
 
-                    <div x-show="detail.near" class="mt-4 rounded-2xl border border-edge bg-card p-4">
-                        <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde pegar</p>
-                        <p class="mt-1 font-semibold" x-text="detail.near && stop(detail.near.stop)"></p>
-                        <p class="text-sm text-mute" x-text="detail.near && `${meters(detail.near.meters)} de ${place.name} · ${walk(detail.near.meters)}`"></p>
+                    <p x-show="!detail.runs" class="rounded-2xl border border-dashed border-edge p-4 text-sm text-mute">
+                        Essa linha não roda <span x-text="days[day].when"></span>. Escolhe outro dia aí em cima.
+                    </p>
+
+                    <div x-show="detail.ways.length > 1" role="group" aria-label="Sentido" class="flex gap-2">
+                        <template x-for="w in detail.ways" x-bind:key="w.dir">
+                            <x-ui.button variant="chip" x-on:click="show(w.dir)" x-bind:aria-pressed="focus === w.dir"
+                                x-bind:class="focus === w.dir && 'border-fg bg-fg text-paper hover:border-fg'">
+                                <span class="h-1.5 w-5 rounded-full" x-bind:class="w.dir === 1 ? 'bg-back' : 'bg-sun'"></span>
+                                <span x-text="label(w.dir)"></span>
+                            </x-ui.button>
+                        </template>
+                        <x-ui.button variant="chip" x-on:click="show(null)" x-bind:aria-pressed="focus === null"
+                            x-bind:class="focus === null && 'border-fg bg-fg text-paper hover:border-fg'">Ambos</x-ui.button>
                     </div>
 
-                    <ul class="mt-4 grid grid-cols-2 gap-2 text-sm text-mute">
-                        <li class="flex items-center gap-2"><span class="h-1.5 w-6 rounded-full bg-sun ring-2 ring-ink"></span> Trajeto da linha</li>
-                        <li class="flex items-center gap-2"><span class="size-3.5 rounded-full border-[3px] border-sun bg-ink"></span> Onde pegar</li>
-                        <li class="flex items-center gap-2"><span class="size-3.5 rounded-full border border-dashed border-ink/60 bg-sun/20"></span> Raio de 1 km</li>
-                        <li class="flex items-center gap-2"><span class="size-2.5 rounded-full border-[1.5px] border-ink bg-white"></span> <span x-text="`${detail.stops.length} paradas`"></span></li>
+                    <div x-show="detail.runs && !me && geo !== 'busy'" class="flex items-center justify-between gap-3 rounded-2xl border border-edge bg-card p-4 text-sm">
+                        <span x-text="geo === 'denied' ? 'Sua localização está bloqueada no navegador. Libera nas configurações pra ver onde pegar.' : 'Liga sua localização pra ver onde pegar e o caminho a pé.'"></span>
+                        <x-ui.button x-show="geo !== 'denied'" x-on:click="locate()" class="shrink-0 text-sm">Usar</x-ui.button>
+                    </div>
+
+                    <template x-if="way()?.board">
+                        <div class="rounded-2xl border border-edge bg-card p-4">
+                            <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde pegar · <span x-text="label(way().dir)"></span></p>
+                            <p class="mt-1 font-semibold" x-text="stop(way().board.stop)"></p>
+                            <p class="text-sm text-mute" x-text="trip()"></p>
+                            <p x-show="detail.ways.length > 1 && way().drop && !way().fits" class="mt-2 rounded-xl bg-alert/10 px-3 py-2 text-sm text-alert">
+                                Nesse sentido o ônibus passa pelo destino antes da sua parada. Dá uma olhada no outro sentido.
+                            </p>
+                            <p class="mt-2 text-xs text-mute">Toca em outra parada no mapa pra trocar.</p>
+                        </div>
+                    </template>
+
+                    <template x-for="w in detail.ways.filter((w) => w.drop && (focus === null || w.dir === focus))" x-bind:key="'drop' + w.dir">
+                        <div class="rounded-2xl border border-edge bg-card p-4">
+                            <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde descer · <span x-text="label(w.dir)"></span></p>
+                            <p class="mt-1 font-semibold" x-text="stop(w.drop.stop)"></p>
+                            <p class="text-sm text-mute" x-text="`${meters(w.drop.meters)} de ${place.name} · ${walking(w.drop.meters)}`"></p>
+                        </div>
+                    </template>
+
+                    <ul class="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl bg-white p-4 text-sm text-ink">
+                        <li class="flex items-center gap-2"><span class="h-1.5 w-6 rounded-full bg-sun ring-2 ring-ink"></span> Ida</li>
+                        <li class="flex items-center gap-2"><span class="h-1.5 w-6 rounded-full bg-back ring-2 ring-ink"></span> Volta</li>
+                        <li class="flex items-center gap-2"><span class="size-3.5 rounded-full border-[3px] border-ink bg-white"></span> Onde pegar</li>
+                        <li class="flex items-center gap-2"><span class="size-3.5 rounded-full border-[3px] border-sun bg-ink"></span> Onde descer</li>
+                        <li class="flex items-center gap-2"><span class="grid size-4 place-items-center rounded-full bg-ink"><span class="size-1.5 rounded-full bg-white"></span></span> Você</li>
+                        <li class="flex items-center gap-2"><span class="w-6 border-t-[3px] border-dotted border-ink"></span> Caminho a pé</li>
                     </ul>
                 </div>
             </template>
@@ -117,6 +188,7 @@
             <footer class="mt-auto border-t border-edge py-4 text-xs text-mute">
                 Linhas: <a href="https://www.granderecife.pe.gov.br" class="underline hover:text-fg">Grande Recife</a> (GTFS, atualizado toda semana) ·
                 Mapa: <a href="https://openfreemap.org" class="underline hover:text-fg">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" class="underline hover:text-fg">OpenStreetMap</a> ·
+                Caminho a pé: <a href="https://routing.openstreetmap.de" class="underline hover:text-fg">FOSSGIS</a> ·
                 <a href="https://github.com/passa-la/site" class="underline hover:text-fg">Código aberto</a>
             </footer>
         </section>

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Site\Home;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'pages.home');
+Route::get('/', Home::class);
