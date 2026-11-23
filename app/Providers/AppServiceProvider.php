@@ -6,11 +6,13 @@ use App\Domain\Geo\Box;
 use App\Domain\Geo\Geocoder;
 use App\Domain\Geo\Point;
 use App\Domain\Geo\Region;
+use App\Domain\Geo\Walker;
 use App\Domain\Transit\Lines;
 use App\Domain\Transit\Source;
 use App\Domain\Transit\Store;
 use App\Infra\Db;
 use App\Infra\Gtfs;
+use App\Infra\Osrm;
 use App\Infra\Photon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
@@ -36,6 +38,12 @@ class AppServiceProvider extends ServiceProvider
             $app->make(Factory::class),
             $app->make('cache.store'),
             config('transit.photon'),
+        ));
+
+        $this->app->bind(Walker::class, fn (Application $app) => new Osrm\Walker(
+            $app->make(Factory::class),
+            $app->make('cache.store'),
+            config('transit.walker'),
         ));
 
         $this->app->singleton(Region::class, fn () => new Region(
