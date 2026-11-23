@@ -15,6 +15,7 @@ final class Home
 
         return view('pages.home', [
             'today' => Day::of(now())->value,
+            'build' => is_file($m = public_path('build/manifest.json')) ? substr((string) md5_file($m), 0, 10) : 'dev',
             'fresh' => $when ? Carbon::instance($when)->locale('pt_BR')->translatedFormat('j \\d\\e F') : null,
         ]);
     }
