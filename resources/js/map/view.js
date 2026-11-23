@@ -1,6 +1,7 @@
 import * as gl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import worker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import { desk } from '../screen'
 import { EMPTY, circle, point } from './shape'
 
 gl.setWorkerUrl(worker)
@@ -29,14 +30,20 @@ export class View {
             style: STYLE,
             center: HUB,
             zoom: 11,
-            attributionControl: { compact: true },
+            attributionControl: false,
         })
-        this.map.addControl(new gl.NavigationControl({ showCompass: false }), 'top-left')
+        this.edge = { right: 0, bottom: 0 }
+        this.map.addControl(new gl.AttributionControl({ compact: true }), desk() ? 'bottom-right' : 'top-right')
+
+        if (desk()) {
+            this.map.addControl(new gl.NavigationControl({ showCompass: false }), 'top-left')
+        }
         this.pin = new gl.Marker({ color: tone('ink') })
         this.me = new gl.Marker({ element: person() })
         this.stop = stop
         this.tap = tap
         this.ready = new Promise((ok) => this.map.on('load', () => ok(this.layers())))
+        this.map.once('load', () => this.map.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'))
     }
 
     layers() {
@@ -170,7 +177,7 @@ export class View {
         this.fit([...circle(a, radius).geometry.coordinates[0], ...circle(b, radius).geometry.coordinates[0]])
     }
 
-    async line(d, { place, me, way, focus, walk, radius, side }, fit = true) {
+    async line(d, { place, me, way, focus, walk, radius }, fit = true) {
         await this.ready
         const shown = d.ways.filter((w) => focus === null || w.dir === focus)
 
@@ -193,7 +200,7 @@ export class View {
         if (fit) {
             const coords = shown.flatMap((w) => (w.geometry.coordinates.length ? w.geometry.coordinates : w.stops.map((s) => [s.lon, s.lat])))
             const extra = [place, me].filter(Boolean).map((p) => [p.lon, p.lat])
-            this.fit([...coords, ...extra], side)
+            this.fit([...coords, ...extra])
         }
     }
 
@@ -205,13 +212,13 @@ export class View {
         this.map.setPaintProperty('path-arrow', 'text-opacity', fade)
     }
 
-    fit(coords, side = 0) {
+    fit(coords) {
         if (!coords.length) {
             return
         }
 
         const box = coords.reduce((b, c) => b.extend(c), new gl.LngLatBounds(coords[0], coords[0]))
-        this.map.fitBounds(box, { padding: { top: 40, bottom: 40, left: 40, right: 40 + side }, duration: 500, maxZoom: 16 })
+        this.map.fitBounds(box, { padding: { top: 40, bottom: 40 + this.edge.bottom, left: 40, right: 40 + this.edge.right }, duration: 500, maxZoom: 16 })
     }
 
     resize() {

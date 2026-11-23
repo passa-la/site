@@ -1,4 +1,5 @@
 import { api } from '../api'
+import { desk } from '../screen'
 
 const MIN = 3
 const WAIT = 300
@@ -21,8 +22,9 @@ export const ride = () => ({
 
     aimAt(f) {
         this.field = f
-        this.aiming = f
-        this.menu = f === 'from' || this.places.length > 0
+        this.aiming = desk() ? f : null
+        this.menu = true
+        this.snapTo('high')
     },
 
     picking() {
@@ -40,6 +42,14 @@ export const ride = () => ({
     stopAim() {
         this.aim = false
         this.aiming = null
+        this.snapTo('mid')
+    },
+
+    mapEnd() {
+        this.aiming = this.field
+        this.menu = false
+        this.snapTo('low')
+        document.activeElement?.blur()
     },
 
     text(f) {
@@ -94,7 +104,16 @@ export const ride = () => ({
 
         if (f === 'from' && !this.ends.to) {
             this.field = 'to'
-            this.$nextTick(() => this.$refs.qb.focus())
+
+            if (this.aiming) {
+                this.aiming = 'to'
+            } else {
+                this.$nextTick(() => this.$refs.qb.focus())
+            }
+        }
+
+        if (this.ends.from && this.ends.to && !this.aiming) {
+            this.snapTo('mid')
         }
 
         await this.trips()
