@@ -12,7 +12,6 @@ final readonly class Source implements Port
         private Factory $http,
         private Reader $reader,
         private string $url,
-        private string $dir,
     ) {}
 
     public function pull(?string $tag): ?Feed
@@ -34,13 +33,14 @@ final readonly class Source implements Port
             return null;
         }
 
-        if (! is_dir($this->dir)) {
-            mkdir($this->dir, 0755, true);
+        $file = (string) tempnam(sys_get_temp_dir(), 'gtfs');
+
+        try {
+            file_put_contents($file, $res->body());
+
+            return $this->reader->read($file, $new);
+        } finally {
+            @unlink($file);
         }
-
-        $file = $this->dir.'/gtfs.zip';
-        file_put_contents($file, $res->body());
-
-        return $this->reader->read($file, $new);
     }
 }

@@ -15,12 +15,16 @@ final class Lines
 {
     public function index(Near $r, Search $search): AnonymousResourceCollection
     {
-        return Pass::collection($search($r->point()))
-            ->additional(['meta' => ['radius' => Circle::WALK]]);
+        $day = $r->day();
+
+        return Pass::collection($search($r->point() ?? abort(422), $day))
+            ->additional(['meta' => ['radius' => Circle::WALK, 'day' => $day->value]]);
     }
 
     public function show(string $id, Spot $r, Show $show): Detail
     {
-        return new Detail($show($id, $r->point()) ?? abort(404));
+        $detail = $show($id, $r->day(), $r->point(), $r->origin(), $r->string('stop')->toString() ?: null);
+
+        return new Detail($detail ?? abort(404));
     }
 }

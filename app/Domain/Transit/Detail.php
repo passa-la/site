@@ -6,8 +6,8 @@ final readonly class Detail
 {
     public function __construct(
         public Line $line,
-        public array $paths,
-        public array $stops,
-        public ?Pass $near = null,
+        public Day $day,
+        public array $ways,
+        public Plan $plan,
     ) {}
 }

@@ -2,6 +2,7 @@
 
 use App\Domain\Geo\Circle;
 use App\Domain\Geo\Point;
+use App\Domain\Transit\Day;
 use App\Domain\Transit\Line;
 use App\Domain\Transit\Nearby;
 use App\Domain\Transit\Pass;
@@ -23,7 +24,7 @@ beforeEach(function () {
 });
 
 it('lists each line once at its closest stop, nearest first', function () {
-    $all = (new Nearby(new Lines($this->lines, $this->stops)))->of(new Circle($this->from));
+    $all = (new Nearby(new Lines($this->lines, $this->stops)))->of(new Circle($this->from), Day::Weekday);
 
     expect(array_map(fn (Pass $p) => [$p->line->code, $p->stop->id], $all))->toBe([
         ['100', 's1'],
@@ -33,7 +34,7 @@ it('lists each line once at its closest stop, nearest first', function () {
 
 it('breaks distance ties by line code', function () {
     $stops = [new Stop('s1', '', new Point(-8.0005, -34.85), ['b', 'a'])];
-    $all = (new Nearby(new Lines($this->lines, $stops)))->of(new Circle($this->from));
+    $all = (new Nearby(new Lines($this->lines, $stops)))->of(new Circle($this->from), Day::Weekday);
 
     expect(array_map(fn (Pass $p) => $p->line->code, $all))->toBe(['100', '200']);
 });

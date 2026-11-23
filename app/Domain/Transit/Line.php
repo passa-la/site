@@ -9,5 +9,11 @@ final readonly class Line
         public string $code,
         public string $name,
         public string $agency,
+        public array $days = [],
     ) {}
+
+    public function runs(Day $d): bool
+    {
+        return in_array($d, $this->days, true);
+    }
 }

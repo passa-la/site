@@ -17,7 +17,7 @@ it('does nothing when the feed did not change', function () {
 });
 
 it('saves the new network with its change', function () {
-    $feed = new Feed('v2', '"new"', new Network([new Line('1', '100', 'A', 'X'), new Line('4', '400', 'D', 'X')], [], []));
+    $feed = new Feed('v2', '"new"', new Network([new Line('1', '100', 'A', 'X'), new Line('4', '400', 'D', 'X')], [], [], []));
     $store = new Store('"old"', ['100', '200']);
 
     $change = (new Sync(new Source($feed), $store))();

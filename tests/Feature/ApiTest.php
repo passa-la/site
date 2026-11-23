@@ -12,9 +12,10 @@ beforeEach(function () {
 });
 
 it('lists lines within one kilometer, nearest first', function () {
-    $this->getJson('/api/v1/lines?lat=-8.0&lon=-34.85')
+    $this->getJson('/api/v1/lines?lat=-8.0&lon=-34.85&day=weekday')
         ->assertOk()
         ->assertJsonPath('meta.radius', 1000)
+        ->assertJsonPath('meta.day', 'weekday')
         ->assertJsonCount(2, 'data')
         ->assertJsonPath('data.0.line.code', '100')
         ->assertJsonPath('data.0.stop.id', 'S1')
@@ -22,6 +23,24 @@ it('lists lines within one kilometer, nearest first', function () {
         ->assertJsonPath('data.0.meters', 11)
         ->assertJsonPath('data.1.line.code', '200')
         ->assertJsonPath('data.1.stop.name', 'Ti Teste');
+});
+
+it('lists only lines that run on the chosen day', function () {
+    $this->getJson('/api/v1/lines?lat=-8.0&lon=-34.85&day=sunday')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.line.code', '100')
+        ->assertJsonPath('data.0.line.days', ['weekday', 'sunday']);
+});
+
+it('defaults to the current service day', function () {
+    $this->travelTo(new DateTimeImmutable('2026-11-29 10:00', new DateTimeZone('America/Recife')));
+
+    $this->getJson('/api/v1/lines?lat=-8.0&lon=-34.85')->assertJsonPath('meta.day', 'sunday');
+});
+
+it('rejects unknown days', function () {
+    $this->getJson('/api/v1/lines?lat=-8.0&lon=-34.85&day=holiday')->assertUnprocessable();
 });
 
 it('returns nothing far from every stop', function () {
@@ -36,21 +55,78 @@ it('validates coordinates', function () {
         ->assertJsonValidationErrors(['lat', 'lon']);
 });
 
-it('shows a line with its full path and where to catch it', function () {
-    $this->getJson('/api/v1/lines/100?lat=-8.0&lon=-34.85')
+it('shows both directions of the day with where to get off', function () {
+    $this->getJson('/api/v1/lines/100?day=weekday&lat=-8.02&lon=-34.85')
         ->assertOk()
         ->assertJsonPath('data.line.name', 'Centro / Praia')
-        ->assertJsonCount(2, 'data.paths')
-        ->assertJsonPath('data.paths.0.geometry.type', 'LineString')
-        ->assertJsonPath('data.paths.0.geometry.coordinates.0', [-34.85, -8.0001])
-        ->assertJsonCount(2, 'data.stops')
-        ->assertJsonPath('data.near.stop.id', 'S1');
+        ->assertJsonPath('data.day', 'weekday')
+        ->assertJsonPath('data.runs', true)
+        ->assertJsonPath('data.best', null)
+        ->assertJsonCount(2, 'data.ways')
+        ->assertJsonPath('data.ways.0.geometry.type', 'LineString')
+        ->assertJsonPath('data.ways.0.geometry.coordinates.0', [-34.85, -8.0001])
+        ->assertJsonPath('data.ways.0.stops.*.id', ['S1', 'S3'])
+        ->assertJsonPath('data.ways.0.drop.stop.id', 'S3')
+        ->assertJsonPath('data.ways.0.board', null)
+        ->assertJsonPath('data.ways.1.stops.*.id', ['S3', 'S1']);
 });
 
-it('shows a line without a point', function () {
-    $this->getJson('/api/v1/lines/200')
+it('follows the sunday trip on sundays', function () {
+    $this->getJson('/api/v1/lines/100?day=sunday')
         ->assertOk()
-        ->assertJsonPath('data.near', null);
+        ->assertJsonPath('data.ways.0.stops.*.id', ['S1', 'S2', 'S3'])
+        ->assertJsonCount(3, 'data.ways.0.geometry.coordinates');
+});
+
+it('recommends the direction that goes from the rider to the destination', function () {
+    $this->getJson('/api/v1/lines/100?day=weekday&lat=-8.02&lon=-34.85&from_lat=-8.0&from_lon=-34.85')
+        ->assertJsonPath('data.best', 0)
+        ->assertJsonPath('data.ways.0.board.stop.id', 'S1')
+        ->assertJsonPath('data.ways.0.fits', true)
+        ->assertJsonPath('data.ways.1.fits', false);
+
+    $this->getJson('/api/v1/lines/100?day=weekday&lat=-8.0&lon=-34.85&from_lat=-8.02&from_lon=-34.85')
+        ->assertJsonPath('data.best', 1);
+});
+
+it('boards at the stop the rider tapped', function () {
+    $this->getJson('/api/v1/lines/100?day=weekday&lat=-8.0&lon=-34.85&from_lat=-8.0&from_lon=-34.85&stop=S3')
+        ->assertJsonPath('data.best', 1)
+        ->assertJsonPath('data.ways.1.board.stop.id', 'S3');
+});
+
+it('says when a line does not run that day', function () {
+    $this->getJson('/api/v1/lines/200?day=sunday')
+        ->assertOk()
+        ->assertJsonPath('data.runs', false)
+        ->assertJsonCount(0, 'data.ways');
+});
+
+it('routes the walk to the stop', function () {
+    Http::fake(['routing.openstreetmap.de/*' => Http::response([
+        'code' => 'Ok',
+        'routes' => [['distance' => 507.3, 'duration' => 410, 'geometry' => ['type' => 'LineString', 'coordinates' => [[-34.8394, -7.9947], [-34.841, -7.994], [-34.843, -7.9939]]]]],
+    ])]);
+
+    $this->getJson('/api/v1/walk?from_lat=-7.9947&from_lon=-34.8394&lat=-7.9939&lon=-34.843')
+        ->assertOk()
+        ->assertJsonPath('data.meters', 507)
+        ->assertJsonPath('data.minutes', 7)
+        ->assertJsonPath('data.exact', true)
+        ->assertJsonCount(3, 'data.geometry.coordinates');
+});
+
+it('walks in a straight line when routing is down', function () {
+    Http::fake(['routing.openstreetmap.de/*' => Http::response('', 503)]);
+
+    $this->getJson('/api/v1/walk?from_lat=-7.9947&from_lon=-34.8394&lat=-7.9939&lon=-34.843')
+        ->assertOk()
+        ->assertJsonPath('data.exact', false)
+        ->assertJsonCount(2, 'data.geometry.coordinates');
+});
+
+it('needs both ends of the walk', function () {
+    $this->getJson('/api/v1/walk?lat=-7.9939&lon=-34.843')->assertUnprocessable();
 });
 
 it('answers 404 for unknown lines', function () {

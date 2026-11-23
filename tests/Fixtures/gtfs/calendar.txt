@@ -1,3 +1,4 @@
 service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
-SVC,1,1,1,1,1,1,1,20200101,20991231
+WK,1,1,1,1,1,0,0,20200101,20991231
+SUN,0,0,0,0,0,0,1,20200101,20991231
 OLD,1,1,1,1,1,1,1,19990101,20000101

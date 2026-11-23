@@ -6,9 +6,11 @@ use App\Domain\Geo\Point;
 use App\Domain\Transit\Change;
 use App\Domain\Transit\Feed;
 use App\Domain\Transit\Line;
+use App\Domain\Transit\Link;
 use App\Domain\Transit\Path;
 use App\Domain\Transit\Stop;
 use App\Domain\Transit\Store as Port;
+use App\Infra\Mask;
 use Illuminate\Database\ConnectionInterface;
 
 final readonly class Store implements Port
@@ -41,6 +43,7 @@ final readonly class Store implements Port
 
             $this->lines($feed->net->lines);
             $this->stops($feed->net->stops);
+            $this->links($feed->net->links);
             $this->paths($feed->net->paths);
 
             $this->db->table('syncs')->insert([
@@ -61,6 +64,7 @@ final readonly class Store implements Port
             'code' => $l->code,
             'name' => $l->name,
             'agency' => $l->agency,
+            'days' => Mask::of($l->days),
         ], $lines);
 
         foreach (array_chunk($rows, self::CHUNK) as $c) {
@@ -76,16 +80,19 @@ final readonly class Store implements Port
                 $c,
             ));
         }
+    }
 
-        $links = [];
+    private function links(array $links): void
+    {
+        $rows = array_map(fn (Link $l) => [
+            'line_id' => $l->line,
+            'stop_id' => $l->stop,
+            'dir' => $l->dir,
+            'seq' => $l->seq,
+            'days' => Mask::of($l->days),
+        ], $links);
 
-        foreach ($stops as $s) {
-            foreach ($s->lines as $l) {
-                $links[] = ['line_id' => (string) $l, 'stop_id' => $s->id];
-            }
-        }
-
-        foreach (array_chunk($links, self::CHUNK) as $c) {
+        foreach (array_chunk($rows, self::CHUNK) as $c) {
             $this->db->table('line_stop')->insert($c);
         }
     }
@@ -93,8 +100,8 @@ final readonly class Store implements Port
     private function paths(array $paths): void
     {
         foreach (array_chunk($paths, 20) as $c) {
-            $this->insert('paths', ['line_id', 'dir', 'geom'], '(?, ?, st_geogfromtext(?))', array_map(
-                fn (Path $p) => [$p->line, $p->dir, $this->wkt($p->points)],
+            $this->insert('paths', ['line_id', 'dir', 'days', 'geom'], '(?, ?, ?, st_geogfromtext(?))', array_map(
+                fn (Path $p) => [$p->line, $p->dir, Mask::of($p->days), $this->wkt($p->points)],
                 $c,
             ));
         }

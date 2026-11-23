@@ -1,8 +1,10 @@
 route_id,service_id,trip_id,trip_headsign,direction_id,shape_id
-100,SVC,T1,Praia,0,SH1
-100,SVC,T2,Centro,1,SH2
-100,SVC,T6,Praia,0,SHX
-100,SVC,T7,Praia,0,SH1
-200,SVC,T3,Shopping,0,SH3
+100,WK,T1,Praia,0,SH1
+100,WK,T7,Praia,0,SH1
+100,WK,T6,Praia,0,SHX
+100,WK,T2,Centro,1,SH2
+100,SUN,T8,Praia,0,SHS
+100,SUN,T9,Centro,1,SH2
+200,WK,T3,Shopping,0,SH3
 300,OLD,T4,Extinta,0,SH4
-M1,SVC,T5,Metrô,0,SH5
+M1,WK,T5,Metrô,0,SH5

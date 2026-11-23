@@ -8,13 +8,6 @@ export const point = (p) => ({
     geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
 })
 
-export const points = (all) => ({ type: 'FeatureCollection', features: all.map(point) })
-
-export const lines = (paths) => ({
-    type: 'FeatureCollection',
-    features: paths.map((p) => ({ type: 'Feature', properties: { dir: p.dir }, geometry: p.geometry })),
-})
-
 export const circle = (p, meters, steps = 72) => {
     const lat = (p.lat * Math.PI) / 180
     const lon = (p.lon * Math.PI) / 180
