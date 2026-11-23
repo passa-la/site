@@ -3,18 +3,19 @@
 namespace Tests\Fakes;
 
 use App\Domain\Geo\Circle;
+use App\Domain\Transit\Day;
 use App\Domain\Transit\Line;
 use App\Domain\Transit\Lines as Port;
-use App\Domain\Transit\Stop;
 
 final class Lines implements Port
 {
     public function __construct(
         private array $lines,
         private array $stops,
+        private array $ways = [],
     ) {}
 
-    public function around(Circle $c): array
+    public function around(Circle $c, Day $d): array
     {
         return $this->stops;
     }
@@ -29,13 +30,8 @@ final class Lines implements Port
         return $this->many([$id])[0] ?? null;
     }
 
-    public function stops(string $id): array
+    public function ways(string $id, Day $d): array
     {
-        return array_values(array_filter($this->stops, fn (Stop $s) => in_array($id, $s->lines, true)));
-    }
-
-    public function paths(string $id): array
-    {
-        return [];
+        return $this->ways;
     }
 }
