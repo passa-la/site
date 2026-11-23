@@ -43,6 +43,26 @@ it('rejects unknown days', function () {
     $this->getJson('/api/v1/lines?lat=-8.0&lon=-34.85&day=holiday')->assertUnprocessable();
 });
 
+it('shrinks the radius on request', function () {
+    $this->getJson('/api/v1/lines?lat=-8.0&lon=-34.85&day=weekday&radius=300')
+        ->assertOk()
+        ->assertJsonPath('meta.radius', 300)
+        ->assertJsonPath('meta.wide', false)
+        ->assertJsonPath('data.*.line.code', ['100']);
+});
+
+it('never searches wider than one kilometer on request', function () {
+    $this->getJson('/api/v1/lines?lat=-8.0&lon=-34.85&radius=5000')->assertUnprocessable();
+});
+
+it('shows the nearest lines when none passes within the radius', function () {
+    $this->getJson('/api/v1/lines?lat=-8.04&lon=-34.85&day=weekday')
+        ->assertOk()
+        ->assertJsonPath('meta.wide', true)
+        ->assertJsonPath('data.*.line.code', ['100', '200'])
+        ->assertJsonPath('data.0.stop.id', 'S3');
+});
+
 it('returns nothing far from every stop', function () {
     $this->getJson('/api/v1/lines?lat=-8.3&lon=-35.0')
         ->assertOk()
@@ -148,6 +168,31 @@ it('suggests places in the state only, skipping bus stops', function () {
 
     Http::assertSent(fn ($r) => str_contains($r->url(), 'bbox=') && $r['q'] === 'patteo');
 });
+
+it('names a tapped point', function () {
+    Http::fake(['photon.komoot.io/reverse*' => Http::response(['features' => [
+        ['geometry' => ['coordinates' => [-34.825, -7.744]], 'properties' => ['name' => 'Ponto 1', 'osm_key' => 'highway', 'osm_value' => 'bus_stop', 'state' => 'Pernambuco']],
+        ['geometry' => ['coordinates' => [-34.825, -7.744]], 'properties' => ['name' => 'Rua Argentina', 'district' => 'Quatro Cantos', 'city' => 'Ilha de Itamaracá', 'state' => 'Pernambuco', 'osm_key' => 'highway', 'osm_value' => 'residential']],
+    ]])]);
+
+    $this->getJson('/api/v1/places/reverse?lat=-7.744&lon=-34.825')
+        ->assertOk()
+        ->assertJsonPath('data.name', 'Rua Argentina')
+        ->assertJsonPath('data.label', 'Quatro Cantos, Ilha de Itamaracá')
+        ->assertJsonPath('data.lat', -7.744);
+});
+
+it('finds lines by code or name, ignoring accents and leading zeros', function (string $q, array $codes) {
+    $this->getJson('/api/v1/lines/search?q='.urlencode($q))
+        ->assertOk()
+        ->assertJsonPath('data.*.code', $codes);
+})->with([
+    'code' => ['200', ['200']],
+    'prefix' => ['1', ['100']],
+    'name' => ['praia', ['100']],
+    'accent' => ['PRACA', ['200']],
+    'nothing' => ['zzz', []],
+]);
 
 it('requires a query of three letters', function () {
     $this->getJson('/api/v1/places?q=ab')->assertUnprocessable();

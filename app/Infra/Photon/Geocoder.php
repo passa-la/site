@@ -15,6 +15,8 @@ final readonly class Geocoder implements Port
 
     private const int LIMIT = 10;
 
+    private const string AGENT = 'passa-la/1.0 (+https://github.com/passa-la/site)';
+
     public function __construct(
         private Factory $http,
         private Repository $cache,
@@ -32,13 +34,39 @@ final readonly class Geocoder implements Port
         return array_map(fn (array $p) => new Place($p['name'], $p['label'], new Point($p['lat'], $p['lon']), $p['state']), $rows);
     }
 
+    public function at(Point $p): ?Place
+    {
+        $key = 'photon:at:'.round($p->lat, 4).','.round($p->lon, 4);
+        $row = $this->cache->remember($key, self::TTL, fn () => $this->near($p));
+
+        return $row ? new Place($row['name'], $row['label'], $p, $row['state']) : null;
+    }
+
+    private function near(Point $p): ?array
+    {
+        $res = $this->http
+            ->baseUrl($this->url)
+            ->withUserAgent(self::AGENT)
+            ->timeout(8)
+            ->get('/reverse', ['lat' => $p->lat, 'lon' => $p->lon, 'limit' => 3])
+            ->throw();
+
+        foreach ($res->json('features') ?? [] as $f) {
+            if ($found = $this->place($f)) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
     private function fetch(string $q, Region $r): array
     {
         $b = $r->box;
 
         $res = $this->http
             ->baseUrl($this->url)
-            ->withUserAgent('passa-la/1.0 (+https://github.com/passa-la/site)')
+            ->withUserAgent(self::AGENT)
             ->timeout(8)
             ->get('/api', [
                 'q' => $q,

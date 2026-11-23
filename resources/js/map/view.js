@@ -7,7 +7,6 @@ gl.setWorkerUrl(worker)
 
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty'
 const HUB = [-34.8711, -8.0631]
-const RADIUS = 1000
 const SIDE = 3
 const DIM = 0.22
 
@@ -24,7 +23,7 @@ const person = () => {
 const all = (features) => ({ type: 'FeatureCollection', features })
 
 export class View {
-    constructor(el, { stop } = {}) {
+    constructor(el, { stop, tap } = {}) {
         this.map = new gl.Map({
             container: el,
             style: STYLE,
@@ -36,6 +35,7 @@ export class View {
         this.pin = new gl.Marker({ color: tone('ink') })
         this.me = new gl.Marker({ element: person() })
         this.stop = stop
+        this.tap = tap
         this.ready = new Promise((ok) => this.map.on('load', () => ok(this.layers())))
     }
 
@@ -120,6 +120,11 @@ export class View {
         })
 
         m.on('click', 'stops', (e) => this.stop?.(String(e.features[0].properties.id)))
+        m.on('click', (e) => {
+            if (!m.queryRenderedFeatures(e.point, { layers: ['stops'] }).length) {
+                this.tap?.({ lat: e.lngLat.lat, lon: e.lngLat.lng })
+            }
+        })
         m.on('mouseenter', 'stops', () => (m.getCanvas().style.cursor = 'pointer'))
         m.on('mouseleave', 'stops', () => (m.getCanvas().style.cursor = ''))
     }
@@ -136,9 +141,9 @@ export class View {
         }
     }
 
-    async place(p, me) {
+    async place(p, me, radius) {
         await this.ready
-        const area = circle(p, RADIUS)
+        const area = circle(p, radius)
 
         this.pin.setLngLat([p.lon, p.lat]).addTo(this.map)
         this.spot(me)
@@ -151,13 +156,16 @@ export class View {
         this.fit(area.geometry.coordinates[0])
     }
 
-    async line(d, { place, me, way, focus, walk }, fit = true) {
+    async line(d, { place, me, way, focus, walk, radius }, fit = true) {
         await this.ready
         const shown = d.ways.filter((w) => focus === null || w.dir === focus)
 
         if (place) {
             this.pin.setLngLat([place.lon, place.lat]).addTo(this.map)
-            this.set('area', circle(place, RADIUS))
+            this.set('area', circle(place, radius))
+        } else {
+            this.pin.remove()
+            this.set('area', EMPTY)
         }
 
         this.spot(me)

@@ -30,6 +30,11 @@ final class Lines implements Port
         return $this->many([$id])[0] ?? null;
     }
 
+    public function match(string $q): array
+    {
+        return array_values(array_filter($this->lines, fn (Line $l) => str_contains($l->code.' '.$l->name, $q)));
+    }
+
     public function ways(string $id, Day $d): array
     {
         return $this->ways;
