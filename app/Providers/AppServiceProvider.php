@@ -30,7 +30,6 @@ class AppServiceProvider extends ServiceProvider
             $app->make(Factory::class),
             new Gtfs\Reader,
             config('transit.feed'),
-            storage_path('app/gtfs'),
         ));
 
         $this->app->bind(Geocoder::class, fn (Application $app) => new Photon\Geocoder(
