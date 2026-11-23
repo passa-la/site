@@ -122,6 +122,35 @@ it('says when a line does not run that day', function () {
         ->assertJsonCount(0, 'data.ways');
 });
 
+it('finds direct lines between two places', function () {
+    $this->getJson('/api/v1/rides?day=weekday&from_lat=-8.0&from_lon=-34.85&lat=-8.02&lon=-34.85')
+        ->assertOk()
+        ->assertJsonPath('meta.day', 'weekday')
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.line.code', '100')
+        ->assertJsonPath('data.0.dir', 0)
+        ->assertJsonPath('data.0.board.stop.id', 'S1')
+        ->assertJsonPath('data.0.drop.stop.id', 'S3')
+        ->assertJsonPath('data.0.hops', 1)
+        ->assertJsonPath('data.0.walk', 11);
+
+    $this->getJson('/api/v1/rides?day=weekday&from_lat=-8.02&from_lon=-34.85&lat=-8.0&lon=-34.85')
+        ->assertJsonPath('data.0.dir', 1);
+});
+
+it('follows the day when looking for direct lines', function () {
+    $this->getJson('/api/v1/rides?day=weekday&from_lat=-8.0&from_lon=-34.85&lat=-8.005&lon=-34.85')
+        ->assertJsonCount(0, 'data');
+
+    $this->getJson('/api/v1/rides?day=sunday&from_lat=-8.0&from_lon=-34.85&lat=-8.005&lon=-34.85&radius=300')
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.drop.stop.id', 'S2');
+});
+
+it('needs both ends of the ride', function () {
+    $this->getJson('/api/v1/rides?lat=-8.0&lon=-34.85')->assertUnprocessable();
+});
+
 it('routes the walk to the stop', function () {
     Http::fake(['routing.openstreetmap.de/*' => Http::response([
         'code' => 'Ok',
