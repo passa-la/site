@@ -7,6 +7,9 @@ const KEEP = 6
 const WALK = 1000
 const RADII = [300, 500, 1000]
 const MIN = { place: 3, line: 1 }
+const SIDE = 390
+
+const desk = () => window.matchMedia('(min-width: 1024px)').matches
 
 const DAYS = {
     weekday: { name: 'Dias úteis', when: 'em dias úteis' },
@@ -159,9 +162,7 @@ export const finder = (today) => ({
     },
 
     async tap(p) {
-        const desk = window.matchMedia('(min-width: 1024px)').matches
-
-        if (this.detail || (!this.aim && !this.place && !desk)) {
+        if (this.detail || (!this.aim && !this.place && !desk())) {
             return
         }
 
@@ -217,7 +218,10 @@ export const finder = (today) => ({
 
             if (push) {
                 this.save()
-                window.scrollTo({ top: 0, behavior: 'smooth' })
+            }
+
+            if (push && !desk()) {
+                this.$nextTick(() => this.$refs.map.scrollIntoView({ behavior: 'smooth', block: 'start' }))
             }
 
             this.remember()
@@ -286,7 +290,16 @@ export const finder = (today) => ({
             return
         }
 
-        const ctx = { place: this.place, me: this.me, way: this.way(), focus: this.focus, walk: this.walk, radius: this.radius }
+        const ctx = {
+            place: this.place,
+            me: this.me,
+            way: this.way(),
+            focus: this.focus,
+            walk: this.walk,
+            radius: this.radius,
+            side: desk() ? SIDE : 0,
+        }
+
         this.draw((v) => v.line(this.detail, ctx, fit))
     },
 

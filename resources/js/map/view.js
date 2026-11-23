@@ -31,7 +31,7 @@ export class View {
             zoom: 11,
             attributionControl: { compact: true },
         })
-        this.map.addControl(new gl.NavigationControl({ showCompass: false }), 'top-right')
+        this.map.addControl(new gl.NavigationControl({ showCompass: false }), 'top-left')
         this.pin = new gl.Marker({ color: tone('ink') })
         this.me = new gl.Marker({ element: person() })
         this.stop = stop
@@ -156,7 +156,7 @@ export class View {
         this.fit(area.geometry.coordinates[0])
     }
 
-    async line(d, { place, me, way, focus, walk, radius }, fit = true) {
+    async line(d, { place, me, way, focus, walk, radius, side }, fit = true) {
         await this.ready
         const shown = d.ways.filter((w) => focus === null || w.dir === focus)
 
@@ -179,7 +179,7 @@ export class View {
         if (fit) {
             const coords = shown.flatMap((w) => (w.geometry.coordinates.length ? w.geometry.coordinates : w.stops.map((s) => [s.lon, s.lat])))
             const extra = [place, me].filter(Boolean).map((p) => [p.lon, p.lat])
-            this.fit([...coords, ...extra])
+            this.fit([...coords, ...extra], side)
         }
     }
 
@@ -191,13 +191,13 @@ export class View {
         this.map.setPaintProperty('path-arrow', 'text-opacity', fade)
     }
 
-    fit(coords) {
+    fit(coords, side = 0) {
         if (!coords.length) {
             return
         }
 
         const box = coords.reduce((b, c) => b.extend(c), new gl.LngLatBounds(coords[0], coords[0]))
-        this.map.fitBounds(box, { padding: 40, duration: 500, maxZoom: 16 })
+        this.map.fitBounds(box, { padding: { top: 40, bottom: 40, left: 40, right: 40 + side }, duration: 500, maxZoom: 16 })
     }
 
     resize() {

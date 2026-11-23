@@ -93,6 +93,17 @@
                 </ul>
             </div>
 
+            <template x-if="place || detail">
+                <div role="group" aria-label="Dia da semana" class="mt-4 flex flex-wrap gap-2">
+                    <template x-for="(v, k) in days" x-bind:key="k">
+                        <x-ui.button variant="chip" x-on:click="pickDay(k)" x-bind:aria-pressed="day === k"
+                            x-bind:class="{ 'border-fg bg-fg text-paper hover:border-fg': day === k, 'line-through opacity-50': !runs(k) }">
+                            <span x-text="v.name"></span><span x-show="k === today" class="text-xs opacity-70">hoje</span>
+                        </x-ui.button>
+                    </template>
+                </div>
+            </template>
+
             <p x-show="fail" x-text="fail" x-cloak class="mt-3 rounded-xl bg-alert/10 px-3 py-2 text-sm text-alert"></p>
         </header>
 
@@ -106,19 +117,76 @@
             </div>
         </section>
 
-        <section class="flex flex-1 flex-col px-4 lg:col-start-1 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:px-0">
-            <template x-if="place || detail">
-                <div role="group" aria-label="Dia da semana" class="flex flex-wrap gap-2 pt-4">
-                    <template x-for="(v, k) in days" x-bind:key="k">
-                        <x-ui.button variant="chip" x-on:click="pickDay(k)" x-bind:aria-pressed="day === k"
-                            x-bind:class="{ 'border-fg bg-fg text-paper hover:border-fg': day === k, 'line-through opacity-50': !runs(k) }">
-                            <span x-text="v.name"></span><span x-show="k === today" class="text-xs opacity-70">hoje</span>
-                        </x-ui.button>
-                    </template>
-                </div>
-            </template>
+        <aside x-show="detail" x-cloak aria-label="Linha selecionada"
+            class="px-4 lg:z-10 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:m-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[360px] lg:self-start lg:justify-self-end lg:overflow-y-auto lg:rounded-3xl lg:border lg:border-edge lg:bg-paper lg:px-5 lg:shadow-2xl">
+                <template x-if="detail">
+                    <div class="space-y-4 py-4 lg:py-5">
+                        <div class="flex items-start gap-3">
+                            <x-ui.code x-text="detail.line.code" class="text-lg" />
+                            <div class="min-w-0 flex-1">
+                                <h2 class="text-xl leading-tight font-semibold" x-text="detail.line.name"></h2>
+                                <p class="text-sm text-mute first-letter:uppercase" x-text="detail.line.agency"></p>
+                            </div>
+                            <x-ui.button variant="ghost" x-on:click="close()" aria-label="Fechar linha" class="-mt-1 -mr-2 px-2">
+                                <x-icon name="close" class="size-5" />
+                            </x-ui.button>
+                        </div>
 
-            <template x-if="place && !detail">
+                        <p x-show="!detail.runs" class="rounded-2xl border border-dashed border-edge p-4 text-sm text-mute">
+                            Essa linha não roda <span x-text="days[day].when"></span>. Escolhe outro dia.
+                        </p>
+
+                        <div x-show="detail.ways.length > 1" role="group" aria-label="Sentido" class="flex gap-2">
+                            <template x-for="w in detail.ways" x-bind:key="w.dir">
+                                <x-ui.button variant="chip" x-on:click="show(w.dir)" x-bind:aria-pressed="focus === w.dir"
+                                    x-bind:class="focus === w.dir && 'border-fg bg-fg text-paper hover:border-fg'">
+                                    <span class="h-1.5 w-5 rounded-full" x-bind:class="w.dir === 1 ? 'bg-back' : 'bg-sun'"></span>
+                                    <span x-text="label(w.dir)"></span>
+                                </x-ui.button>
+                            </template>
+                            <x-ui.button variant="chip" x-on:click="show(null)" x-bind:aria-pressed="focus === null"
+                                x-bind:class="focus === null && 'border-fg bg-fg text-paper hover:border-fg'">Ambos</x-ui.button>
+                        </div>
+
+                        <div x-show="detail.runs && !me && geo !== 'busy'" class="flex items-center justify-between gap-3 rounded-2xl border border-edge bg-card p-4 text-sm">
+                            <span x-text="geo === 'denied' ? 'Sua localização está bloqueada no navegador. Libera nas configurações pra ver onde pegar.' : 'Liga sua localização pra ver onde pegar e o caminho a pé.'"></span>
+                            <x-ui.button x-show="geo !== 'denied'" x-on:click="locate()" class="shrink-0 text-sm">Usar</x-ui.button>
+                        </div>
+
+                        <template x-if="way()?.board">
+                            <div class="rounded-2xl border border-edge bg-card p-4">
+                                <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde pegar · <span x-text="label(way().dir)"></span></p>
+                                <p class="mt-1 font-semibold" x-text="stop(way().board.stop)"></p>
+                                <p class="text-sm text-mute" x-text="trip()"></p>
+                                <p x-show="detail.ways.length > 1 && way().drop && !way().fits" class="mt-2 rounded-xl bg-alert/10 px-3 py-2 text-sm text-alert">
+                                    Nesse sentido o ônibus passa pelo destino antes da sua parada. Dá uma olhada no outro sentido.
+                                </p>
+                                <p class="mt-2 text-xs text-mute">Toca em outra parada no mapa pra trocar.</p>
+                            </div>
+                        </template>
+
+                        <template x-for="w in detail.ways.filter((w) => w.drop && (focus === null || w.dir === focus))" x-bind:key="'drop' + w.dir">
+                            <div class="rounded-2xl border border-edge bg-card p-4">
+                                <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde descer · <span x-text="label(w.dir)"></span></p>
+                                <p class="mt-1 font-semibold" x-text="stop(w.drop.stop)"></p>
+                                <p class="text-sm text-mute" x-text="`${meters(w.drop.meters)} de ${place.name} · ${walking(w.drop.meters)}`"></p>
+                            </div>
+                        </template>
+
+                        <ul class="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl bg-white p-4 text-sm text-ink">
+                            <li class="flex items-center gap-2"><span class="h-1.5 w-6 rounded-full bg-sun ring-2 ring-ink"></span> Ida</li>
+                            <li class="flex items-center gap-2"><span class="h-1.5 w-6 rounded-full bg-back ring-2 ring-ink"></span> Volta</li>
+                            <li class="flex items-center gap-2"><span class="size-3.5 rounded-full border-[3px] border-ink bg-white"></span> Onde pegar</li>
+                            <li class="flex items-center gap-2"><span class="size-3.5 rounded-full border-[3px] border-sun bg-ink"></span> Onde descer</li>
+                            <li class="flex items-center gap-2"><span class="grid size-4 place-items-center rounded-full bg-ink"><span class="size-1.5 rounded-full bg-white"></span></span> Você</li>
+                            <li class="flex items-center gap-2"><span class="w-6 border-t-[3px] border-dotted border-ink"></span> Caminho a pé</li>
+                        </ul>
+                    </div>
+                </template>
+        </aside>
+
+        <section class="flex flex-1 flex-col px-4 lg:col-start-1 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:px-0">
+            <template x-if="place">
                 <div class="pb-6">
                     <div role="group" aria-label="Distância" class="flex items-center gap-2 pt-2">
                         <span class="text-sm text-mute">Até</span>
@@ -150,7 +218,8 @@
                     <ul class="divide-y divide-edge">
                         <template x-for="h in hits" x-bind:key="h.line.id">
                             <li>
-                                <x-ui.button variant="row" x-on:click="open(h.line.id)" x-bind:disabled="busy === 'line'" class="gap-3">
+                                <x-ui.button variant="row" x-on:click="open(h.line.id)" x-bind:disabled="busy === 'line'" x-bind:aria-current="detail?.line.id === h.line.id"
+                                    x-bind:class="detail?.line.id === h.line.id && 'bg-edge/70 ring-1 ring-fg/20'" class="gap-3">
                                     <x-ui.code x-text="h.line.code" />
                                     <span class="min-w-0 flex-1">
                                         <span class="block truncate font-medium" x-text="h.line.name"></span>
@@ -163,72 +232,6 @@
                                 </x-ui.button>
                             </li>
                         </template>
-                    </ul>
-                </div>
-            </template>
-
-            <template x-if="detail">
-                <div class="space-y-4 py-4">
-                    <x-ui.button variant="ghost" x-on:click="close()" class="-ml-3">
-                        <x-icon name="back" class="size-4" /> <span x-text="place ? 'Voltar pra lista' : 'Voltar'"></span>
-                    </x-ui.button>
-
-                    <div class="flex items-start gap-3">
-                        <x-ui.code x-text="detail.line.code" class="text-lg" />
-                        <div class="min-w-0">
-                            <h2 class="text-xl leading-tight font-semibold" x-text="detail.line.name"></h2>
-                            <p class="text-sm text-mute first-letter:uppercase" x-text="detail.line.agency"></p>
-                        </div>
-                    </div>
-
-                    <p x-show="!detail.runs" class="rounded-2xl border border-dashed border-edge p-4 text-sm text-mute">
-                        Essa linha não roda <span x-text="days[day].when"></span>. Escolhe outro dia aí em cima.
-                    </p>
-
-                    <div x-show="detail.ways.length > 1" role="group" aria-label="Sentido" class="flex gap-2">
-                        <template x-for="w in detail.ways" x-bind:key="w.dir">
-                            <x-ui.button variant="chip" x-on:click="show(w.dir)" x-bind:aria-pressed="focus === w.dir"
-                                x-bind:class="focus === w.dir && 'border-fg bg-fg text-paper hover:border-fg'">
-                                <span class="h-1.5 w-5 rounded-full" x-bind:class="w.dir === 1 ? 'bg-back' : 'bg-sun'"></span>
-                                <span x-text="label(w.dir)"></span>
-                            </x-ui.button>
-                        </template>
-                        <x-ui.button variant="chip" x-on:click="show(null)" x-bind:aria-pressed="focus === null"
-                            x-bind:class="focus === null && 'border-fg bg-fg text-paper hover:border-fg'">Ambos</x-ui.button>
-                    </div>
-
-                    <div x-show="detail.runs && !me && geo !== 'busy'" class="flex items-center justify-between gap-3 rounded-2xl border border-edge bg-card p-4 text-sm">
-                        <span x-text="geo === 'denied' ? 'Sua localização está bloqueada no navegador. Libera nas configurações pra ver onde pegar.' : 'Liga sua localização pra ver onde pegar e o caminho a pé.'"></span>
-                        <x-ui.button x-show="geo !== 'denied'" x-on:click="locate()" class="shrink-0 text-sm">Usar</x-ui.button>
-                    </div>
-
-                    <template x-if="way()?.board">
-                        <div class="rounded-2xl border border-edge bg-card p-4">
-                            <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde pegar · <span x-text="label(way().dir)"></span></p>
-                            <p class="mt-1 font-semibold" x-text="stop(way().board.stop)"></p>
-                            <p class="text-sm text-mute" x-text="trip()"></p>
-                            <p x-show="detail.ways.length > 1 && way().drop && !way().fits" class="mt-2 rounded-xl bg-alert/10 px-3 py-2 text-sm text-alert">
-                                Nesse sentido o ônibus passa pelo destino antes da sua parada. Dá uma olhada no outro sentido.
-                            </p>
-                            <p class="mt-2 text-xs text-mute">Toca em outra parada no mapa pra trocar.</p>
-                        </div>
-                    </template>
-
-                    <template x-for="w in detail.ways.filter((w) => w.drop && (focus === null || w.dir === focus))" x-bind:key="'drop' + w.dir">
-                        <div class="rounded-2xl border border-edge bg-card p-4">
-                            <p class="text-xs font-medium tracking-wide text-mute uppercase">Onde descer · <span x-text="label(w.dir)"></span></p>
-                            <p class="mt-1 font-semibold" x-text="stop(w.drop.stop)"></p>
-                            <p class="text-sm text-mute" x-text="`${meters(w.drop.meters)} de ${place.name} · ${walking(w.drop.meters)}`"></p>
-                        </div>
-                    </template>
-
-                    <ul class="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl bg-white p-4 text-sm text-ink">
-                        <li class="flex items-center gap-2"><span class="h-1.5 w-6 rounded-full bg-sun ring-2 ring-ink"></span> Ida</li>
-                        <li class="flex items-center gap-2"><span class="h-1.5 w-6 rounded-full bg-back ring-2 ring-ink"></span> Volta</li>
-                        <li class="flex items-center gap-2"><span class="size-3.5 rounded-full border-[3px] border-ink bg-white"></span> Onde pegar</li>
-                        <li class="flex items-center gap-2"><span class="size-3.5 rounded-full border-[3px] border-sun bg-ink"></span> Onde descer</li>
-                        <li class="flex items-center gap-2"><span class="grid size-4 place-items-center rounded-full bg-ink"><span class="size-1.5 rounded-full bg-white"></span></span> Você</li>
-                        <li class="flex items-center gap-2"><span class="w-6 border-t-[3px] border-dotted border-ink"></span> Caminho a pé</li>
                     </ul>
                 </div>
             </template>
