@@ -2,6 +2,8 @@ import { api } from './api'
 import { store } from './store'
 import { marks } from './finder/marks'
 import { ride } from './finder/ride'
+import { sheet } from './finder/sheet'
+import { desk } from './screen'
 
 const WAIT = 300
 const PACE = 75
@@ -11,7 +13,6 @@ const RADII = [300, 500, 1000]
 const MIN = { place: 3, line: 1 }
 const SIDE = 390
 
-const desk = () => window.matchMedia('(min-width: 1024px)').matches
 
 const DAYS = {
     weekday: { name: 'Dias úteis', when: 'em dias úteis' },
@@ -30,6 +31,7 @@ const HINTS = {
 export const finder = (today) => ({
     ...marks(),
     ...ride(),
+    ...sheet(),
     q: '',
     mode: 'place',
     places: [],
@@ -216,6 +218,7 @@ export const finder = (today) => ({
         this.aim = false
         this.places = []
         this.reset()
+        this.snapTo('mid')
 
         if (push) {
             this.save()
@@ -249,7 +252,7 @@ export const finder = (today) => ({
     },
 
     async tap(p) {
-        if (this.detail || (!this.aim && !this.place && this.mode !== 'ride' && !desk())) {
+        if (this.detail || !(desk() || this.aim || this.aiming)) {
             return
         }
 
@@ -282,6 +285,8 @@ export const finder = (today) => ({
     target() {
         this.aim = true
         this.menu = false
+        this.snapTo('low')
+        document.activeElement?.blur()
         this.draw(() => {})
     },
 
@@ -320,9 +325,8 @@ export const finder = (today) => ({
                 this.save()
             }
 
-            if (push && !desk()) {
-                this.$nextTick(() => this.$refs.map.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-            }
+            this.snapTo('mid')
+            this.$nextTick(() => this.$refs.scroll?.scrollTo({ top: 0, behavior: 'smooth' }))
 
             this.remember()
 
@@ -402,7 +406,6 @@ export const finder = (today) => ({
             focus: this.focus,
             walk: this.walk,
             radius: this.radius,
-            side: desk() ? SIDE : 0,
         }
 
         this.draw((v) => v.line(this.detail, ctx, fit))
@@ -541,8 +544,13 @@ export const finder = (today) => ({
         this.$nextTick(async () => {
             const v = await this.map
             v.resize()
+            v.edge = this.edge()
             fn(v)
         })
+    },
+
+    edge() {
+        return desk() ? { right: this.detail ? SIDE : 0, bottom: 0 } : { right: 0, bottom: this.sheetPx() }
     },
 
     url() {
